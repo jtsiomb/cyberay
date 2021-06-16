@@ -6,9 +6,10 @@ bin = cyberay
 opt = -O3 -ffast-math
 dbg = -g
 warn = -pedantic -Wall
+inc = -Ilibs
 
-CFLAGS = $(warn) $(opt) $(dbg) -pthread -MMD
-LDFLAGS = $(libgl) -lm -pthread
+CFLAGS = $(warn) $(opt) $(dbg) -pthread -MMD $(inc)
+LDFLAGS = $(libgl) -lm -pthread -limago
 
 libgl = -lGL -lGLU -lglut
 
