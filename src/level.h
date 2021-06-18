@@ -13,6 +13,6 @@ struct level {
 
 int load_level(struct level *lvl, const char *fname);
 
-int ray_level(cgm_ray *ray, struct level *lvl, float maxt, struct hitpoint *hit);
+int ray_level(cgm_ray *ray, struct level *lvl, float tmax, struct rayhit *hit);
 
 #endif	/* LEVEL_H_ */

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <GL/glut.h>
 #include <cgmath/cgmath.h>
+#include "mesh.h"
 
 enum {
 	KEY_F1		= GLUT_KEY_F1 | 0x100,
@@ -46,7 +47,7 @@ static void motion(int x, int y);
 static long start_time;
 
 static float cam_theta, cam_phi;
-static cgm_vec3 cam_pos;
+static cgm_vec3 cam_pos = {0, -1.6, 0};
 static float pxform[16];
 
 static int mouse_x, mouse_y;
@@ -61,6 +62,8 @@ static int keymap[NUM_INPUTS][2] = {
 	{'a', KEY_LEFT},
 	{' ', 0}
 };
+
+static struct mesh mesh;
 
 int main(int argc, char **argv)
 {
@@ -97,15 +100,20 @@ static int init(void)
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 
+	if(load_mesh(&mesh, "data/testlvl.obj") == -1) {
+		return -1;
+	}
+
 	start_time = glutGet(GLUT_ELAPSED_TIME);
 	return 0;
 }
 
 static void cleanup(void)
 {
+	destroy_mesh(&mesh);
 }
 
-#define WALK_SPEED 1.0f
+#define WALK_SPEED 3.0f
 static void update(void)
 {
 	static unsigned int prev_upd;
@@ -152,6 +160,8 @@ static void display(void)
 	glFrontFace(GL_CW);
 	glutSolidTeapot(1.0);
 	glFrontFace(GL_CCW);
+
+	draw_mesh(&mesh);
 
 	glutSwapBuffers();
 	assert(glGetError() == GL_NO_ERROR);

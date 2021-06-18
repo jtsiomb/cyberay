@@ -15,6 +15,7 @@ struct mesh {
 };
 
 int load_mesh(struct mesh *m, const char *fname);
+void destroy_mesh(struct mesh *m);
 void draw_mesh(struct mesh *m);
 
 #endif	/* MESH_H_ */
