@@ -63,7 +63,7 @@ static int keymap[NUM_INPUTS][2] = {
 	{' ', 0}
 };
 
-static struct mesh mesh;
+static struct scenefile scn;
 
 int main(int argc, char **argv)
 {
@@ -100,7 +100,7 @@ static int init(void)
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 
-	if(load_mesh(&mesh, "data/testlvl.obj") == -1) {
+	if(load_scenefile(&scn, "data/testlvl.obj") == -1) {
 		return -1;
 	}
 
@@ -110,7 +110,7 @@ static int init(void)
 
 static void cleanup(void)
 {
-	destroy_mesh(&mesh);
+	destroy_scenefile(&scn);
 }
 
 #define WALK_SPEED 3.0f
@@ -150,6 +150,8 @@ static void update(void)
 
 static void display(void)
 {
+	struct mesh *mesh;
+
 	update();
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -157,11 +159,18 @@ static void display(void)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadMatrixf(pxform);
 
-	glFrontFace(GL_CW);
-	glutSolidTeapot(1.0);
-	glFrontFace(GL_CCW);
+	mesh = scn.meshlist;
+	while(mesh) {
+		float col[4];
+		col[0] = mesh->mtl.color.x;
+		col[1] = mesh->mtl.color.y;
+		col[2] = mesh->mtl.color.z;
+		col[3] = 1.0f;
+		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, col);
 
-	draw_mesh(&mesh);
+		draw_mesh(mesh);
+		mesh = mesh->next;
+	}
 
 	glutSwapBuffers();
 	assert(glGetError() == GL_NO_ERROR);

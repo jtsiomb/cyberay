@@ -8,6 +8,270 @@ struct facevertex {
 	int vidx, tidx, nidx;
 };
 
+struct objmtl {
+	char name[64];
+	cgm_vec3 ka, kd, ks;
+	float shin;
+	float alpha;
+	float ior;
+	struct objmtl *next;
+};
+
+static void calc_face_normal(struct triangle *tri);
+static char *cleanline(char *s);
+static char *parse_idx(char *ptr, int *idx, int arrsz);
+static char *parse_face_vert(char *ptr, struct facevertex *fv, int numv, int numt, int numn);
+
+static struct objmtl *load_mtllib(const char *objfname, const char *mtlfname);
+static void free_mtllist(struct objmtl *mtl);
+static void conv_mtl(struct material *mm, struct objmtl *om);
+
+#define GROW_ARRAY(arr, sz)	\
+	do { \
+		int newsz = (sz) ? (sz) * 2 : 16; \
+		void *tmp = realloc(arr, newsz * sizeof *(arr)); \
+		if(!tmp) { \
+			fprintf(stderr, "failed to grow array to %d\n", newsz); \
+			goto fail; \
+		} \
+		arr = tmp; \
+		sz = newsz; \
+	} while(0)
+
+
+int load_scenefile(struct scenefile *scn, const char *fname)
+{
+	int i, nlines, total_faces = 0, res = -1;
+	FILE *fp;
+	char buf[256], *line, *ptr;
+	int varr_size, varr_max, narr_size, narr_max, tarr_size, tarr_max, max_faces;
+	cgm_vec3 v, *varr = 0, *narr = 0;
+	cgm_vec2 *tarr = 0;
+	struct facevertex fv[4];
+	int numfv;
+	struct mesh *mesh;
+	struct triangle *tri;
+	static const cgm_vec2 def_tc = {0, 0};
+	struct objmtl curmtl, *mtl, *mtllist = 0;
+
+
+	varr_size = varr_max = narr_size = narr_max = tarr_size = tarr_max = 0;
+	varr = narr = 0;
+	tarr = 0;
+
+	if(!(fp = fopen(fname, "rb"))) {
+		fprintf(stderr, "load_scenefile: failed to open %s\n", fname);
+		return -1;
+	}
+
+	if(!(mesh = calloc(1, sizeof *mesh))) {
+		fprintf(stderr, "failed to allocate mesh\n");
+		fclose(fp);
+		return -1;
+	}
+	max_faces = 0;
+
+	scn->meshlist = 0;
+	scn->num_meshes = 0;
+
+	/* default material: white diffuse */
+	memset(&curmtl, 0, sizeof curmtl);
+	cgm_vcons(&curmtl.kd, 1.0f, 1.0f, 1.0f);
+	curmtl.alpha = curmtl.ior = 1.0f;
+
+	nlines = 0;
+	while(fgets(buf, sizeof buf, fp)) {
+		nlines++;
+		if(!(line = cleanline(buf))) {
+			continue;
+		}
+
+		switch(line[0]) {
+		case 'v':
+			v.x = v.y = v.z = 0.0f;
+			if(sscanf(line + 2, "%f %f %f", &v.x, &v.y, &v.z) < 2) {
+				break;
+			}
+			if(isspace(line[1])) {
+				if(varr_size >= varr_max) {
+					GROW_ARRAY(varr, varr_max);
+				}
+				varr[varr_size++] = v;
+			} else if(line[1] == 't' && isspace(line[2])) {
+				if(tarr_size >= tarr_max) {
+					GROW_ARRAY(tarr, tarr_max);
+				}
+				tarr[tarr_size++] = *(cgm_vec2*)&v;
+			} else if(line[1] == 'n' && isspace(line[2])) {
+				if(narr_size >= narr_max) {
+					GROW_ARRAY(narr, narr_max);
+				}
+				narr[narr_size++] = v;
+			}
+			break;
+
+		case 'f':
+			if(!isspace(line[1])) break;
+
+			ptr = line + 2;
+
+			numfv = 0;
+			for(i=0; i<4; i++) {
+				if(!(ptr = parse_face_vert(ptr, fv + i, varr_size, tarr_size, narr_size))) {
+					break;
+				}
+				numfv++;
+			}
+			if(numfv < 3) break;
+
+			if(mesh->num_faces >= max_faces - 1) {
+				GROW_ARRAY(mesh->faces, max_faces);
+			}
+			tri = mesh->faces + mesh->num_faces++;
+			tri->mtl = &mesh->mtl;
+
+			tri->v[0].pos = varr[fv[0].vidx];
+			tri->v[1].pos = varr[fv[1].vidx];
+			tri->v[2].pos = varr[fv[2].vidx];
+			calc_face_normal(tri);
+			for(i=0; i<3; i++) {
+				tri->v[i].norm = fv[i].nidx >= 0 ? narr[fv[i].nidx] : tri->norm;
+				tri->v[i].tex = fv[i].tidx >= 0 ? tarr[fv[i].tidx] : def_tc;
+			}
+
+			if(numfv > 3) {
+				tri++;
+				mesh->num_faces++;
+				tri->mtl = &mesh->mtl;
+				tri->norm = tri[-1].norm;
+				tri->v[0] = tri[-1].v[0];
+				tri->v[1] = tri[-1].v[1];
+
+				tri->v[2].pos = varr[fv[3].vidx];
+				tri->v[2].norm = fv[3].nidx >= 0 ? narr[fv[3].nidx] : tri->norm;
+				tri->v[2].tex = fv[3].tidx >= 0 ? tarr[fv[3].tidx] : def_tc;
+			}
+			break;
+
+		case 'o':
+		case 'g':
+			if(mesh->num_faces) {
+				conv_mtl(&mesh->mtl, &curmtl);
+				total_faces += mesh->num_faces;
+				mesh->next = scn->meshlist;
+				scn->meshlist = mesh;
+				scn->num_meshes++;
+
+				printf("added mesh with mtl: %s\n", curmtl.name);
+
+				if(!(mesh = calloc(1, sizeof *mesh))) {
+					fprintf(stderr, "failed to allocate mesh\n");
+					goto fail;
+				}
+				max_faces = 0;
+			}
+			break;
+
+		case 'm':
+			if(memcmp(line, "mtllib", 6) == 0 && (line = cleanline(line + 6))) {
+				free_mtllist(mtllist);
+				mtllist = load_mtllib(fname, line);
+			}
+			break;
+
+		case 'u':
+			if(memcmp(line, "usemtl", 6) == 0 && (line = cleanline(line + 6))) {
+				mtl = mtllist;
+				while(mtl) {
+					if(strcmp(mtl->name, line) == 0) {
+						curmtl = *mtl;
+						break;
+					}
+					mtl = mtl->next;
+				}
+			}
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	if(mesh->num_faces) {
+		conv_mtl(&mesh->mtl, &curmtl);
+		total_faces += mesh->num_faces;
+		mesh->next = scn->meshlist;
+		scn->meshlist = mesh;
+		scn->num_meshes++;
+
+		printf("added mesh with mtl: %s\n", curmtl.name);
+	} else {
+		free(mesh);
+	}
+	mesh = 0;
+
+	printf("load_scenefile: loaded %d meshes, %d vertices, %d triangles\n", scn->num_meshes,
+			varr_size, total_faces);
+
+	res = 0;
+
+fail:
+	fclose(fp);
+	free(mesh);
+	free(varr);
+	free(narr);
+	free(tarr);
+	free_mtllist(mtllist);
+	return res;
+}
+
+void destroy_scenefile(struct scenefile *scn)
+{
+	struct mesh *m;
+	while(scn->meshlist) {
+		m = scn->meshlist;
+		scn->meshlist = scn->meshlist->next;
+		free(m);
+	}
+}
+
+void destroy_mesh(struct mesh *m)
+{
+	free(m->faces);
+	m->faces = 0;
+}
+
+void draw_mesh(struct mesh *m)
+{
+	int i;
+
+	glBegin(GL_TRIANGLES);
+	for(i=0; i<m->num_faces; i++) {
+		glNormal3fv((float*)&m->faces[i].v[0].norm);
+		glVertex3fv((float*)&m->faces[i].v[0].pos);
+
+		glNormal3fv((float*)&m->faces[i].v[1].norm);
+		glVertex3fv((float*)&m->faces[i].v[1].pos);
+
+		glNormal3fv((float*)&m->faces[i].v[2].norm);
+		glVertex3fv((float*)&m->faces[i].v[2].pos);
+	}
+	glEnd();
+}
+
+static void calc_face_normal(struct triangle *tri)
+{
+	cgm_vec3 va, vb;
+
+	va = tri->v[1].pos;
+	cgm_vsub(&va, &tri->v[0].pos);
+	vb = tri->v[2].pos;
+	cgm_vsub(&vb, &tri->v[0].pos);
+
+	cgm_vcross(&tri->norm, &va, &vb);
+	cgm_vnormalize(&tri->norm);
+}
+
 static char *cleanline(char *s)
 {
 	char *ptr;
@@ -16,7 +280,7 @@ static char *cleanline(char *s)
 
 	while(*s && isspace(*s)) s++;
 	ptr = s + strlen(s) - 1;
-	while(ptr >= s && isspace(*s)) *ptr-- = 0;
+	while(ptr >= s && isspace(*ptr)) *ptr-- = 0;
 
 	return *s ? s : 0;
 }
@@ -43,12 +307,13 @@ static char *parse_idx(char *ptr, int *idx, int arrsz)
  */
 static char *parse_face_vert(char *ptr, struct facevertex *fv, int numv, int numt, int numn)
 {
+	fv->tidx = fv->nidx = -1;
+
 	if(!(ptr = parse_idx(ptr, &fv->vidx, numv)))
 		return 0;
 	if(*ptr != '/') return (!*ptr || isspace(*ptr)) ? ptr : 0;
 
 	if(*++ptr == '/') {	/* no texcoord */
-		fv->tidx = -1;
 		++ptr;
 	} else {
 		if(!(ptr = parse_idx(ptr, &fv->tidx, numt)))
@@ -62,162 +327,67 @@ static char *parse_face_vert(char *ptr, struct facevertex *fv, int numv, int num
 	return (!*ptr || isspace(*ptr)) ? ptr : 0;
 }
 
-
-#define APPEND(prefix)	\
-	do { \
-		if(prefix##count >= prefix##max) { \
-			int newsz = prefix##max ? prefix##max * 2 : 8; \
-			void *ptr = realloc(prefix##arr, newsz * sizeof(cgm_vec3)); \
-			if(!ptr) { \
-				fprintf(stderr, "load_mesh: failed to resize array to %d elements\n", newsz); \
-				return -1; \
-			} \
-			prefix##arr = ptr; \
-			prefix##max = newsz; \
-		} \
-	} while(0)
-
-
-int load_mesh(struct mesh *m, const char *fname)
+static struct objmtl *load_mtllib(const char *objfname, const char *mtlfname)
 {
-	int i, num, nline, sidx, didx, res = -1;
 	FILE *fp;
-	cgm_vec3 v, va, vb, fnorm;
-	cgm_vec3 *varr, *narr, *tarr;
-	int vcount, ncount, tcount, vmax, nmax, tmax, max_faces, newsz;
-	char linebuf[256], *line, *ptr;
-	struct facevertex fv[4];
-	struct triangle *tri;
-	void *tmpptr;
-	static const int quadidx[] = { 0, 1, 2, 0, 1, 3 };
+	char *sep;
+	char buf[256], *line;
+	struct objmtl *mlist = 0, *m = 0;
 
-	varr = narr = tarr = 0;
-	vcount = ncount = tcount = vmax = nmax = tmax = 0;
+	strcpy(buf, objfname);
+	if((sep = strrchr(buf, '/'))) {
+		sep[1] = 0;
+	} else {
+		buf[0] = 0;
+	}
+	strcat(buf, mtlfname);
 
-	m->faces = 0;
-	m->num_faces = 0;
-	max_faces = 0;
-
-	if(!(fp = fopen(fname, "rb"))) {
-		fprintf(stderr, "load_mesh: failed to open: %s\n", fname);
-		return -1;
+	if(!(fp = fopen(buf, "rb"))) {
+		return 0;
 	}
 
-	nline = 0;
-	while(fgets(linebuf, sizeof linebuf, fp)) {
-		nline++;
-		if(!(line = cleanline(linebuf))) {
+	while(fgets(buf, sizeof buf, fp)) {
+		if(!(line = cleanline(buf))) {
 			continue;
 		}
 
-		switch(line[0]) {
-		case 'v':
-			v.y = v.z = 0;
-			if((num = sscanf(line + 2, "%f %f %f", &v.x, &v.y, &v.z)) < 2) {
-verr:			fprintf(stderr, "load_mesh: ignoring malformed attribute at %d: %s\n", nline, line);
-				continue;
+		if(memcmp(line, "newmtl", 6) == 0) {
+			if(m) {
+				m->next = mlist;
+				mlist = m;
 			}
-			if(isspace(line[1])) {
-				APPEND(v);
-				varr[vcount++] = v;
-			} else if(line[1] == 'n' && isspace(line[2])) {
-				APPEND(n);
-				narr[ncount++] = v;
-			} else if(line[1] == 't' && isspace(line[2])) {
-				APPEND(t);
-				tarr[tcount].x = v.x;
-				tarr[tcount++].y = v.y;
-			} else {
-				goto verr;
-			}
-			break;
-
-		case 'f':
-			if(!isspace(line[1])) {
-				break;
-			}
-			ptr = line + 2;
-			for(i=0; i<4; i++) {
-				fv[i].nidx = fv[i].tidx = -1;
-				if(!(ptr = parse_face_vert(ptr, fv + i, vcount, tcount, ncount))) {
-					break;
+			if((m = calloc(1, sizeof *m))) {
+				if((line = cleanline(line + 6))) {
+					strcpy(m->name, line);
 				}
 			}
-
-			if(i < 2) {
-				fprintf(stderr, "load_mesh: invalid face definition at %d: %s\n", nline, line);
-				break;
+		} else if(memcmp(line, "Kd", 2) == 0) {
+			if(m) {
+				sscanf(line + 3, "%f %f %f", &m->kd.x, &m->kd.y, &m->kd.z);
 			}
-
-			va = varr[fv[1].vidx];
-			cgm_vsub(&va, varr + fv[0].vidx);
-			vb = varr[fv[2].vidx];
-			cgm_vsub(&vb, varr + fv[0].vidx);
-			cgm_vcross(&fnorm, &va, &vb);
-			cgm_vnormalize(&fnorm);
-
-			if(m->num_faces >= max_faces - 1) {
-				newsz = max_faces ? max_faces * 2 : 16;
-				if(!(tmpptr = realloc(m->faces, newsz * sizeof *m->faces))) {
-					fprintf(stderr, "load_mesh: failed to resize faces array to %d\n", newsz);
-					goto end;
-				}
-				m->faces = tmpptr;
-				max_faces = newsz;
-			}
-
-			num = i > 3 ? 6 : 3;
-			for(i=0; i<num; i++) {
-				if(i % 3 == 0) {
-					tri = m->faces + m->num_faces++;
-					tri->norm = fnorm;
-					tri->mtl = &m->mtl;
-				}
-				sidx = quadidx[i];
-				didx = i >= 3 ? i - 3 : i;
-				tri->v[didx].pos = varr[fv[sidx].vidx];
-				tri->v[didx].norm = fv[sidx].nidx >= 0 ? varr[fv[sidx].nidx] : fnorm;
-				if(fv[sidx].tidx >= 0) {
-					tri->v[didx].tex.x = tarr[fv[sidx].tidx].x;
-					tri->v[didx].tex.y = tarr[fv[sidx].tidx].y;
-				} else {
-					tri->v[didx].tex.x = tri->v[sidx].tex.y = 0;
-				}
-			}
-			break;
 		}
-
 	}
 
-	res = 0;
-end:
-	free(varr);
-	free(narr);
-	free(tarr);
+	if(m) {
+		m->next = mlist;
+		mlist = m;
+	}
+
 	fclose(fp);
-	return res;
+	return mlist;
 }
 
-void destroy_mesh(struct mesh *m)
+static void free_mtllist(struct objmtl *mtl)
 {
-	free(m->faces);
-	m->faces = 0;
-}
-
-void draw_mesh(struct mesh *m)
-{
-	int i;
-
-	glBegin(GL_TRIANGLES);
-	for(i=0; i<m->num_faces; i++) {
-		glNormal3fv(&m->faces[i].v[0].norm);
-		glVertex3fv(&m->faces[i].v[0].pos);
-
-		glNormal3fv(&m->faces[i].v[1].norm);
-		glVertex3fv(&m->faces[i].v[1].pos);
-
-		glNormal3fv(&m->faces[i].v[2].norm);
-		glVertex3fv(&m->faces[i].v[2].pos);
+	while(mtl) {
+		void *tmp = mtl;
+		mtl = mtl->next;
+		free(tmp);
 	}
-	glEnd();
+}
+
+static void conv_mtl(struct material *mm, struct objmtl *om)
+{
+	mm->color = om->kd;
+	/* TODO */
 }

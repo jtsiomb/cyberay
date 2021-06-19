@@ -12,9 +12,17 @@ struct mesh {
 	struct aabox aabb;
 
 	struct material mtl;
+	struct mesh *next;
 };
 
-int load_mesh(struct mesh *m, const char *fname);
+struct scenefile {
+	struct mesh *meshlist;
+	int num_meshes;
+};
+
+int load_scenefile(struct scenefile *scn, const char *fname);
+void destroy_scenefile(struct scenefile *scn);
+
 void destroy_mesh(struct mesh *m);
 void draw_mesh(struct mesh *m);
 

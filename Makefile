@@ -3,7 +3,7 @@ obj = $(src:.c=.o)
 dep = $(src:.c=.d)
 bin = cyberay
 
-opt = -O3 -ffast-math
+opt = -O3 -ffast-math -fno-strict-aliasing
 dbg = -g
 warn = -pedantic -Wall
 inc = -Ilibs
