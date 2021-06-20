@@ -12,4 +12,15 @@ struct material {
 	struct image *tex_color;
 };
 
+struct framebuffer {
+	int width, height;
+	cgm_vec3 *pixels;
+};
+
+extern struct framebuffer fb;
+
+int fbsize(int width, int height);
+
+void render(void);
+
 #endif	/* RT_H_ */

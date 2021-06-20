@@ -42,7 +42,7 @@ static void skeydown(int key, int x, int y);
 static void skeyup(int key, int x, int y);
 static void mouse(int bn, int st, int x, int y);
 static void motion(int x, int y);
-
+static unsigned int nextpow2(unsigned int x);
 
 static long start_time;
 
@@ -64,6 +64,12 @@ static int keymap[NUM_INPUTS][2] = {
 };
 
 static struct level lvl;
+
+static unsigned int tex;
+static int tex_width, tex_height;
+static int tex_intfmt;
+static float tex_xform[16];
+
 
 int main(int argc, char **argv)
 {
@@ -96,9 +102,18 @@ static int init(void)
 {
 	glEnable(GL_CULL_FACE);
 
+	/*
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
+	*/
+
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	tex_intfmt = GL_RGB16F;
 
 	if(load_level(&lvl, "data/test.lvl") == -1) {
 		return -1;
@@ -111,6 +126,8 @@ static int init(void)
 static void cleanup(void)
 {
 	destroy_level(&lvl);
+
+	glDeleteTextures(1, &tex);
 }
 
 #define WALK_SPEED 3.0f
@@ -152,12 +169,30 @@ static void display(void)
 {
 	update();
 
+	render();
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fb.width, fb.height, GL_RGB, GL_FLOAT, fb.pixels);
+	glEnable(GL_TEXTURE_2D);
+
+	glBegin(GL_QUADS);
+	glTexCoord2f(0, 0);
+	glVertex2f(-1, -1);
+	glTexCoord2f(1, 0);
+	glVertex2f(1, -1);
+	glTexCoord2f(1, 1);
+	glVertex2f(1, 1);
+	glTexCoord2f(0, 1);
+	glVertex2f(-1, 1);
+	glEnd();
+
+	/*
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadMatrixf(pxform);
 
 	draw_level(&lvl);
+	*/
 
 	glutSwapBuffers();
 	assert(glGetError() == GL_NO_ERROR);
@@ -170,12 +205,27 @@ static void idle(void)
 
 static void reshape(int x, int y)
 {
+	/*
 	float proj[16];
 
 	cgm_mperspective(proj, cgm_deg_to_rad(50.0f), (float)x / (float)y, 0.5, 500.0);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadMatrixf(proj);
+	*/
+
+	if(x > tex_width || y > tex_height) {
+		tex_width = nextpow2(x);
+		tex_height = nextpow2(y);
+
+		glBindTexture(GL_TEXTURE_2D, tex);
+		glTexImage2D(GL_TEXTURE_2D, 0, tex_intfmt, tex_width, tex_height, 0, GL_RGB, GL_FLOAT, 0);
+	}
+	fbsize(x, y);
+	cgm_mscaling(tex_xform, (float)x / tex_width, (float)y / tex_height, 1.0f);
+
+	glMatrixMode(GL_TEXTURE);
+	glLoadMatrixf(tex_xform);
 }
 
 static void keyb(int key, int press)
@@ -233,4 +283,15 @@ static void motion(int x, int y)
 		if(cam_phi < -M_PI) cam_phi = -M_PI;
 		if(cam_phi > M_PI) cam_phi = M_PI;
 	}
+}
+
+static unsigned int nextpow2(unsigned int x)
+{
+	x--;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return x + 1;
 }
