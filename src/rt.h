@@ -3,6 +3,7 @@
 
 #include <cgmath/cgmath.h>
 #include "image.h"
+#include "tpool.h"
 
 struct material {
 	cgm_vec3 color;
@@ -18,6 +19,8 @@ struct framebuffer {
 };
 
 extern struct framebuffer fb;
+extern struct thread_pool *tpool;
+extern float view_xform[16];
 
 int fbsize(int width, int height);
 

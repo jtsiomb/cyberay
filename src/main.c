@@ -4,6 +4,7 @@
 #include <cgmath/cgmath.h>
 #include "miniglut.h"
 #include "level.h"
+#include "rt.h"
 
 enum {
 	KEY_F1		= GLUT_KEY_F1 | 0x100,
@@ -48,7 +49,6 @@ static long start_time;
 
 static float cam_theta, cam_phi;
 static cgm_vec3 cam_pos = {0, -1.6, 0};
-static float pxform[16];
 
 static int mouse_x, mouse_y;
 static int bnstate[8];
@@ -100,6 +100,11 @@ int main(int argc, char **argv)
 
 static int init(void)
 {
+	if(!(tpool = tpool_create(0))) {
+		fprintf(stderr, "failed to create thread pool\n");
+		return -1;
+	}
+
 	glEnable(GL_CULL_FACE);
 
 	/*
@@ -128,6 +133,8 @@ static void cleanup(void)
 	destroy_level(&lvl);
 
 	glDeleteTextures(1, &tex);
+
+	tpool_destroy(tpool);
 }
 
 #define WALK_SPEED 3.0f
@@ -159,10 +166,10 @@ static void update(void)
 	cam_pos.x += cos(cam_theta) * vright + sin(cam_theta) * vfwd;
 	cam_pos.z += sin(cam_theta) * vright - cos(cam_theta) * vfwd;
 
-	cgm_midentity(pxform);
-	cgm_mtranslate(pxform, cam_pos.x, cam_pos.y, cam_pos.z);
-	cgm_mrotate_y(pxform, cam_theta);
-	cgm_mrotate_x(pxform, cam_phi);
+	cgm_midentity(view_xform);
+	cgm_mtranslate(view_xform, cam_pos.x, cam_pos.y, cam_pos.z);
+	cgm_mrotate_y(view_xform, cam_theta);
+	cgm_mrotate_x(view_xform, cam_phi);
 }
 
 static void display(void)
@@ -189,7 +196,7 @@ static void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glMatrixMode(GL_MODELVIEW);
-	glLoadMatrixf(pxform);
+	glLoadMatrixf(view_xform);
 
 	draw_level(&lvl);
 	*/
@@ -205,6 +212,7 @@ static void idle(void)
 
 static void reshape(int x, int y)
 {
+	glViewport(0, 0, x, y);
 	/*
 	float proj[16];
 
