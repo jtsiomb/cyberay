@@ -162,8 +162,6 @@ int load_scenefile(struct scenefile *scn, const char *fname)
 				scn->meshlist = mesh;
 				scn->num_meshes++;
 
-				printf("added mesh with mtl: %s\n", curmtl.name);
-
 				if(!(mesh = calloc(1, sizeof *mesh))) {
 					fprintf(stderr, "failed to allocate mesh\n");
 					goto fail;

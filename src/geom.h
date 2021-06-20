@@ -17,15 +17,16 @@ struct triangle {
 };
 
 struct aabox {
-	cgm_vec3 p, r;
+	cgm_vec3 vmin, vmax;
 };
 
 struct bvhnode {
 	struct aabox aabb;
 
-	struct triangle **faces;
-	int num_faces, max_faces;
+	struct triangle *faces;
+	int num_faces;
 
+	struct bvhnode *next;
 	struct bvhnode *sub;
 	int num_sub;
 };
@@ -36,6 +37,8 @@ struct rayhit {
 	cgm_ray ray;
 	struct material *mtl;
 };
+
+void free_bvh_tree(struct bvhnode *tree);
 
 int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *hit);
 int ray_aabox_any(cgm_ray *ray, struct aabox *box, float tmax);

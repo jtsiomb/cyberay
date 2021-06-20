@@ -1,6 +1,22 @@
 #include <float.h>
 #include "geom.h"
 
+void free_bvh_tree(struct bvhnode *tree)
+{
+	struct bvhnode *node, *tmp;
+
+	free(tree->faces);
+
+	node = tree->sub;
+	while(node) {
+		tmp = node;
+		node = node->next;
+		free_bvh_tree(tmp);
+	}
+
+	free(tree);
+}
+
 int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *hit)
 {
 	float t, ndotdir;
@@ -37,11 +53,9 @@ int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *
 
 #define SLABCHECK(dim)	\
 	do { \
-		min = box->p.dim - box->r.dim;	\
-		max = box->p.dim + box->r.dim;	\
 		invdir = 1.0f / ray->dir.dim;	\
-		t0 = (min - ray->origin.dim) * invdir;	\
-		t1 = (max - ray->origin.dim) * invdir;	\
+		t0 = (box->vmin.dim - ray->origin.dim) * invdir;	\
+		t1 = (box->vmax.dim - ray->origin.dim) * invdir;	\
 		if(invdir < 0.0f) {	\
 			tmp = t0;	\
 			t0 = t1;	\
@@ -55,7 +69,7 @@ int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *
 int ray_aabox_any(cgm_ray *ray, struct aabox *box, float tmax)
 {
 	float invdir, t0, t1, tmp;
-	float min, max, tmin = 0.0f;
+	float tmin = 0.0f;
 
 	SLABCHECK(x);
 	SLABCHECK(y);
@@ -75,7 +89,7 @@ int ray_bvhnode(cgm_ray *ray, struct bvhnode *bn, float tmax, struct rayhit *hit
 
 	if(!hit) {
 		for(i=0; i<bn->num_faces; i++) {
-			if(ray_triangle(ray, bn->faces[i], tmax, 0)) {
+			if(ray_triangle(ray, bn->faces + i, tmax, 0)) {
 				return 1;
 			}
 		}
@@ -84,7 +98,7 @@ int ray_bvhnode(cgm_ray *ray, struct bvhnode *bn, float tmax, struct rayhit *hit
 
 	hit0.t = FLT_MAX;
 	for(i=0; i<bn->num_faces; i++) {
-		if(ray_triangle(ray, bn->faces[i], tmax, hit) && hit->t < hit0.t) {
+		if(ray_triangle(ray, bn->faces + i, tmax, hit) && hit->t < hit0.t) {
 			hit0 = *hit;
 			res = 1;
 		}

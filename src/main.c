@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <GL/glut.h>
 #include <cgmath/cgmath.h>
-#include "mesh.h"
+#include "miniglut.h"
+#include "level.h"
 
 enum {
 	KEY_F1		= GLUT_KEY_F1 | 0x100,
@@ -63,7 +63,7 @@ static int keymap[NUM_INPUTS][2] = {
 	{' ', 0}
 };
 
-static struct scenefile scn;
+static struct level lvl;
 
 int main(int argc, char **argv)
 {
@@ -100,7 +100,7 @@ static int init(void)
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 
-	if(load_scenefile(&scn, "data/testlvl.obj") == -1) {
+	if(load_level(&lvl, "data/test.lvl") == -1) {
 		return -1;
 	}
 
@@ -110,7 +110,7 @@ static int init(void)
 
 static void cleanup(void)
 {
-	destroy_scenefile(&scn);
+	destroy_level(&lvl);
 }
 
 #define WALK_SPEED 3.0f
@@ -150,8 +150,6 @@ static void update(void)
 
 static void display(void)
 {
-	struct mesh *mesh;
-
 	update();
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -159,18 +157,7 @@ static void display(void)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadMatrixf(pxform);
 
-	mesh = scn.meshlist;
-	while(mesh) {
-		float col[4];
-		col[0] = mesh->mtl.color.x;
-		col[1] = mesh->mtl.color.y;
-		col[2] = mesh->mtl.color.z;
-		col[3] = 1.0f;
-		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, col);
-
-		draw_mesh(mesh);
-		mesh = mesh->next;
-	}
+	draw_level(&lvl);
 
 	glutSwapBuffers();
 	assert(glGetError() == GL_NO_ERROR);
@@ -183,9 +170,12 @@ static void idle(void)
 
 static void reshape(int x, int y)
 {
+	float proj[16];
+
+	cgm_mperspective(proj, cgm_deg_to_rad(50.0f), (float)x / (float)y, 0.5, 500.0);
+
 	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(50.0, (float)x / (float)y, 0.5, 500.0);
+	glLoadMatrixf(proj);
 }
 
 static void keyb(int key, int press)
