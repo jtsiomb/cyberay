@@ -119,6 +119,8 @@ static void draw_level_rec(struct bvhnode *bn)
 	struct material *curmtl;
 	float color[4] = {0, 0, 0, 1};
 
+	if(!bn) return;
+
 	if(bn->faces) {
 		tri = bn->faces;
 		curmtl = tri->mtl;
@@ -145,11 +147,8 @@ static void draw_level_rec(struct bvhnode *bn)
 		glEnd();
 	}
 
-	bn = bn->sub;
-	while(bn) {
-		draw_level_rec(bn);
-		bn = bn->next;
-	}
+	draw_level_rec(bn->left);
+	draw_level_rec(bn->right);
 }
 
 void draw_level(struct level *lvl)

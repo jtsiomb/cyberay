@@ -7,13 +7,8 @@ void free_bvh_tree(struct bvhnode *tree)
 
 	free(tree->faces);
 
-	node = tree->sub;
-	while(node) {
-		tmp = node;
-		node = node->next;
-		free_bvh_tree(tmp);
-	}
-
+	free_bvh_tree(tree->left);
+	free_bvh_tree(tree->right);
 	free(tree);
 }
 

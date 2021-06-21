@@ -33,8 +33,8 @@ int fbsize(int width, int height)
 	if(!(fbptr = malloc(width * height * sizeof *fb.pixels))) {
 		return -1;
 	}
-	xtiles = width / TILESZ;
-	ytiles = height / TILESZ;
+	xtiles = (width + TILESZ - 1) / TILESZ;
+	ytiles = (height + TILESZ - 1) / TILESZ;
 	if(!(tileptr = malloc(xtiles * ytiles * sizeof *tiles))) {
 		free(fbptr);
 		return -1;

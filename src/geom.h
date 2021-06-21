@@ -26,9 +26,7 @@ struct bvhnode {
 	struct triangle *faces;
 	int num_faces;
 
-	struct bvhnode *next;
-	struct bvhnode *sub;
-	int num_sub;
+	struct bvhnode *left, *right;
 };
 
 struct rayhit {
