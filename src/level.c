@@ -86,6 +86,29 @@ void destroy_level(struct level *lvl)
 
 int ray_level(cgm_ray *ray, struct level *lvl, float tmax, struct rayhit *hit)
 {
+	int found = 0;
+	struct rayhit hit0;
+
+	if(!hit) {
+		if(ray_bvhnode(ray, lvl->st_root, tmax, 0)) return 1;
+		if(ray_bvhnode(ray, lvl->dyn_root, tmax, 0)) return 1;
+		return 0;
+	}
+
+	hit0.t = FLT_MAX;
+	if(ray_bvhnode(ray, lvl->st_root, tmax, hit)) {
+		hit0 = *hit;
+		found = 1;
+	}
+	if(ray_bvhnode(ray, lvl->dyn_root, tmax, hit) && hit->t < hit0.t) {
+		hit0 = *hit;
+		found = 1;
+	}
+
+	if(found) {
+		*hit = hit0;
+		return 1;
+	}
 	return 0;
 }
 

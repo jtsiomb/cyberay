@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <cgmath/cgmath.h>
 #include "miniglut.h"
+#include "game.h"
 #include "level.h"
 #include "rt.h"
 
@@ -62,8 +63,6 @@ static int keymap[NUM_INPUTS][2] = {
 	{'a', KEY_LEFT},
 	{' ', 0}
 };
-
-static struct level lvl;
 
 static unsigned int tex;
 static int tex_width, tex_height;

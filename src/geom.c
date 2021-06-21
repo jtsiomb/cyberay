@@ -20,7 +20,7 @@ void free_bvh_tree(struct bvhnode *tree)
 int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *hit)
 {
 	float t, ndotdir;
-	cgm_vec3 vdir, bc;
+	cgm_vec3 vdir, bc, pos;
 
 	if(fabs(ndotdir = cgm_vdot(&ray->dir, &tri->norm)) <= 1e-6) {
 		return 0;
@@ -29,17 +29,23 @@ int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *
 	vdir = tri->v[0].pos;
 	cgm_vsub(&vdir, &ray->origin);
 
-	if((t = cgm_vdot(&ray->dir, &vdir) / ndotdir) <= 1e-6 || t > tmax) {
+	if((t = cgm_vdot(&tri->norm, &vdir) / ndotdir) <= 1e-6 || t > tmax) {
 		return 0;
 	}
+
+	cgm_raypos(&pos, ray, t);
+	cgm_bary(&bc, &tri->v[0].pos, &tri->v[1].pos, &tri->v[2].pos, &pos);
+
+	if(bc.x < 0.0f || bc.x > 1.0f) return 0;
+	if(bc.y < 0.0f || bc.y > 1.0f) return 0;
+	if(bc.z < 0.0f || bc.z > 1.0f) return 0;
 
 	if(hit) {
 		hit->t = t;
 		hit->ray = *ray;
 		hit->mtl = tri->mtl;
 
-		cgm_raypos(&hit->v.pos, ray, t);
-		cgm_bary(&bc, &tri->v[0].pos, &tri->v[1].pos, &tri->v[2].pos, &hit->v.pos);
+		hit->v.pos = pos;
 
 		hit->v.norm.x = tri->v[0].norm.x * bc.x + tri->v[1].norm.x * bc.y + tri->v[2].norm.x * bc.z;
 		hit->v.norm.y = tri->v[0].norm.y * bc.x + tri->v[1].norm.y * bc.y + tri->v[2].norm.y * bc.z;
