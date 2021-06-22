@@ -201,8 +201,6 @@ int load_scenefile(struct scenefile *scn, const char *fname)
 		mesh->next = scn->meshlist;
 		scn->meshlist = mesh;
 		scn->num_meshes++;
-
-		printf("added mesh with mtl: %s\n", curmtl.name);
 	} else {
 		free(mesh);
 	}

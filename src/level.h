@@ -8,8 +8,7 @@ struct level {
 	struct bvhnode *st_root;
 	struct bvhnode *dyn_root;
 
-	struct material *mtls;
-	int num_mtls, max_mtls;
+	struct mesh *meshlist;
 };
 
 int load_level(struct level *lvl, const char *fname);

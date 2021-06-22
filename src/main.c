@@ -46,8 +46,6 @@ static void mouse(int bn, int st, int x, int y);
 static void motion(int x, int y);
 static unsigned int nextpow2(unsigned int x);
 
-static long start_time;
-
 static float cam_theta, cam_phi;
 static cgm_vec3 cam_pos = {0, 1.6, 0};
 
@@ -68,6 +66,9 @@ static unsigned int tex;
 static int tex_width, tex_height;
 static int tex_intfmt;
 static float tex_xform[16];
+
+static unsigned long nframes;
+static unsigned long start_time;
 
 
 int main(int argc, char **argv)
@@ -98,6 +99,8 @@ int main(int argc, char **argv)
 	}
 	atexit(cleanup);
 
+	start_time = glutGet(GLUT_ELAPSED_TIME);
+
 	glutMainLoop();
 	return 0;
 }
@@ -122,13 +125,16 @@ static int init(void)
 	if(load_level(&lvl, "data/test.lvl") == -1) {
 		return -1;
 	}
-
-	start_time = glutGet(GLUT_ELAPSED_TIME);
 	return 0;
 }
 
 static void cleanup(void)
 {
+	float tsec;
+
+	tsec = (glutGet(GLUT_ELAPSED_TIME) - start_time) / 1000.0f;
+	printf("avg framerate: %.2f fps\n", (float)nframes / tsec);
+
 	destroy_level(&lvl);
 
 	glDeleteTextures(1, &tex);
@@ -140,7 +146,7 @@ static void cleanup(void)
 static void update(void)
 {
 	static unsigned int prev_upd;
-	unsigned int msec;
+	unsigned long msec;
 	float dt, vfwd, vright;
 
 	msec = glutGet(GLUT_ELAPSED_TIME) - start_time;
@@ -193,6 +199,8 @@ static void display(void)
 
 	glutSwapBuffers();
 	assert(glGetError() == GL_NO_ERROR);
+
+	nframes++;
 }
 
 static void idle(void)

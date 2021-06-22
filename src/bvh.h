@@ -7,7 +7,7 @@ struct bvhnode {
 	struct aabox aabb;
 	int axis;
 
-	struct triangle *faces;
+	struct triangle **faces;
 	int num_faces, max_faces;
 
 	struct bvhnode *left, *right;
