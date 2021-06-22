@@ -1,17 +1,6 @@
 #include <float.h>
 #include "geom.h"
 
-void free_bvh_tree(struct bvhnode *tree)
-{
-	struct bvhnode *node, *tmp;
-
-	free(tree->faces);
-
-	free_bvh_tree(tree->left);
-	free_bvh_tree(tree->right);
-	free(tree);
-}
-
 int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *hit)
 {
 	float t, ndotdir;
@@ -79,31 +68,31 @@ int ray_aabox_any(cgm_ray *ray, struct aabox *box, float tmax)
 	return 1;
 }
 
-int ray_bvhnode(cgm_ray *ray, struct bvhnode *bn, float tmax, struct rayhit *hit)
+void aabox_union(struct aabox *res, struct aabox *a, struct aabox *b)
 {
-	int i, res = 0;
-	struct rayhit hit0;
+	res->vmin.x = a->vmin.x < b->vmin.x ? a->vmin.x : b->vmin.x;
+	res->vmax.x = a->vmax.x > b->vmax.x ? a->vmax.x : b->vmax.x;
+	res->vmin.y = a->vmin.y < b->vmin.y ? a->vmin.y : b->vmin.y;
+	res->vmax.y = a->vmax.y > b->vmax.y ? a->vmax.y : b->vmax.y;
+	res->vmin.z = a->vmin.z < b->vmin.z ? a->vmin.z : b->vmin.z;
+	res->vmax.z = a->vmax.z > b->vmax.z ? a->vmax.z : b->vmax.z;
+}
 
-	if(!ray_aabox_any(ray, &bn->aabb, tmax)) {
-		return 0;
-	}
+float aabox_surf_area(struct aabox *box)
+{
+	float dx, dy, dz;
 
-	if(!hit) {
-		for(i=0; i<bn->num_faces; i++) {
-			if(ray_triangle(ray, bn->faces + i, tmax, 0)) {
-				return 1;
-			}
-		}
-		return 0;
-	}
+	dx = box->vmax.x - box->vmin.x;
+	dy = box->vmax.y - box->vmin.y;
+	dz = box->vmax.z - box->vmin.z;
 
-	hit0.t = FLT_MAX;
-	for(i=0; i<bn->num_faces; i++) {
-		if(ray_triangle(ray, bn->faces + i, tmax, hit) && hit->t < hit0.t) {
-			hit0 = *hit;
-			res = 1;
-		}
+	return surf_area(dx, dy, dz);
+}
+
+float surf_area(float dx, float dy, float dz)
+{
+	if(dx <= 0 || dy <= 0 || dz <= 0) {
+		return 0.0f;
 	}
-	*hit = hit0;
-	return res;
+	return (dx * dy + dx * dz + dy * dz) * 2.0f;
 }

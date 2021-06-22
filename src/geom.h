@@ -20,15 +20,6 @@ struct aabox {
 	cgm_vec3 vmin, vmax;
 };
 
-struct bvhnode {
-	struct aabox aabb;
-
-	struct triangle *faces;
-	int num_faces;
-
-	struct bvhnode *left, *right;
-};
-
 struct rayhit {
 	float t;
 	struct vertex v;
@@ -36,10 +27,11 @@ struct rayhit {
 	struct material *mtl;
 };
 
-void free_bvh_tree(struct bvhnode *tree);
-
 int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *hit);
 int ray_aabox_any(cgm_ray *ray, struct aabox *box, float tmax);
-int ray_bvhnode(cgm_ray *ray, struct bvhnode *bn, float tmax, struct rayhit *hit);
+
+void aabox_union(struct aabox *res, struct aabox *a, struct aabox *b);
+float aabox_surf_area(struct aabox *box);
+float surf_area(float dx, float dy, float dz);
 
 #endif	/* GEOM_H_ */

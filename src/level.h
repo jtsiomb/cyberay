@@ -2,7 +2,7 @@
 #define LEVEL_H_
 
 #include "rt.h"
-#include "geom.h"
+#include "bvh.h"
 
 struct level {
 	struct bvhnode *st_root;
