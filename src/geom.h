@@ -30,6 +30,8 @@ struct rayhit {
 int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *hit);
 int ray_aabox_any(cgm_ray *ray, struct aabox *box, float tmax);
 
+void aabox_init(struct aabox *box);
+void aabox_addface(struct aabox *box, struct triangle *tri);
 void aabox_union(struct aabox *res, struct aabox *a, struct aabox *b);
 float aabox_surf_area(struct aabox *box);
 float surf_area(float dx, float dy, float dz);

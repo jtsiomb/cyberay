@@ -1,22 +1,36 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
 #include "bvh.h"
 
 #define SPLIT_BUCKETS	8
 
+static float eval_split_cost(struct bvhnode *node, float area, float sp, struct triangle **tribuf, int *part);
+
 int build_bvh_sah(struct bvhnode *tree)
 {
-	int i, j, best;
+	int i, best;
 	float sp, sp0, spgap, area, ext[3];
 	float spcost[SPLIT_BUCKETS];
 	int part[SPLIT_BUCKETS];
-	struct triangle **tribuf, **src;
+	struct triangle **tribuf;
+	struct aabox *aabb = &tree->aabb;
 
-	if(tree->num_faces < 16 || tree->left || tree->right) return 0;
+	if(tree->left || tree->right) return 0;
 
-	ext[0] = tree->aabb.vmax.x - tree->aabb.vmin.x;
-	ext[1] = tree->aabb.vmax.y - tree->aabb.vmin.y;
-	ext[2] = tree->aabb.vmax.z - tree->aabb.vmin.z;
+	/* calculate the bounding box for this node */
+	aabox_init(aabb);
+	for(i=0; i<tree->num_faces; i++) {
+		aabox_addface(aabb, tree->faces[i]);
+	}
+
+	if(tree->num_faces < 16) {
+		return 0;
+	}
+
+	ext[0] = aabb->vmax.x - aabb->vmin.x;
+	ext[1] = aabb->vmax.y - aabb->vmin.y;
+	ext[2] = aabb->vmax.z - aabb->vmin.z;
 
 	if((area = surf_area(ext[0], ext[1], ext[2])) <= 0.0f) return 0;
 
@@ -33,7 +47,7 @@ int build_bvh_sah(struct bvhnode *tree)
 
 	for(i=0; i<SPLIT_BUCKETS; i++) {
 		sp = sp0 + i * spgap;
-		spcost[i] = eval_cost(tree, area, sp, tribuf + i * tree->num_faces, part + i);
+		spcost[i] = eval_split_cost(tree, area, sp, tribuf + i * tree->num_faces, part + i);
 	}
 
 	best = 0;
@@ -41,6 +55,12 @@ int build_bvh_sah(struct bvhnode *tree)
 		if(spcost[i] < spcost[best]) {
 			best = i;
 		}
+	}
+
+	if(spcost[best] > tree->num_faces) {
+		/* the best split cost is worst than the no-split case */
+		free(tribuf);
+		return 0;
 	}
 
 	/* found the best split, allocate child nodes, split the original array and copy
@@ -54,22 +74,28 @@ int build_bvh_sah(struct bvhnode *tree)
 	}
 
 	memcpy(tree->faces, tribuf + best * tree->num_faces, tree->num_faces * sizeof *tribuf);
+	free(tribuf);
 
 	tree->left->faces = tree->faces;
 	tree->left->num_faces = part[best];
 	tree->right->faces = tree->faces + part[best];
 	tree->right->num_faces = tree->faces - tree->left->faces;
 
-	/* TODO: calc aabox for each child node */
-	free(tribuf);
+	build_bvh_sah(tree->left);
+	build_bvh_sah(tree->right);
+	return 0;
 }
 
-static float eval_cost(struct bvhnode *node, float area, float sp, struct triangle **tribuf, int *part)
+static float eval_split_cost(struct bvhnode *node, float area, float sp, struct triangle **tribuf, int *part)
 {
-	int i;
-	float cost;
+	int i, nleft, nright;
+	float cost, sa_left, sa_right, cost_left, cost_right;
 	struct triangle *tri;
 	struct triangle **pleft, **pright;
+	struct aabox bbleft, bbright;
+
+	aabox_init(&bbleft);
+	aabox_init(&bbright);
 
 	/* partition on sp */
 	pleft = tribuf;
@@ -77,16 +103,27 @@ static float eval_cost(struct bvhnode *node, float area, float sp, struct triang
 
 	for(i=0; i<node->num_faces; i++) {
 		tri = node->faces[i];
-		if(cgm_velem(tri->v, node->axis) < sp) {
+		if(cgm_velem(&tri->v[0].pos, node->axis) < sp) {
+			aabox_addface(&bbleft, tri);
 			*pleft++ = tri;
 		} else {
+			aabox_addface(&bbright, tri);
 			*pright-- = tri;
 		}
 	}
 
-	/* TODO calc cost */
+	nleft = pleft - tribuf;
+	nright = node->num_faces - nleft;
 
-	*part = pleft - tribuf;
+	sa_left = aabox_surf_area(&bbleft);
+	sa_right = aabox_surf_area(&bbright);
+
+	/* intersection cost = 1, traversal cost = 0.2 * intesection cost */
+	cost_left = sa_left * nleft;
+	cost_right = sa_right * nright;
+	cost = 0.2f + (cost_left + cost_right) / area;
+
+	*part = nleft;
 	return cost;
 }
 

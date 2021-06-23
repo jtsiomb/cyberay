@@ -68,6 +68,25 @@ int ray_aabox_any(cgm_ray *ray, struct aabox *box, float tmax)
 	return 1;
 }
 
+void aabox_init(struct aabox *box)
+{
+	box->vmin.x = box->vmin.y = box->vmin.z = FLT_MAX;
+	box->vmax.x = box->vmax.y = box->vmax.z = -FLT_MAX;
+}
+
+void aabox_addface(struct aabox *box, struct triangle *tri)
+{
+	int i;
+	for(i=0; i<3; i++) {
+		if(tri->v[i].pos.x < box->vmin.x) box->vmin.x = tri->v[i].pos.x;
+		if(tri->v[i].pos.x > box->vmax.x) box->vmax.x = tri->v[i].pos.x;
+		if(tri->v[i].pos.y < box->vmin.y) box->vmin.y = tri->v[i].pos.y;
+		if(tri->v[i].pos.y > box->vmax.y) box->vmax.y = tri->v[i].pos.y;
+		if(tri->v[i].pos.z < box->vmin.z) box->vmin.z = tri->v[i].pos.z;
+		if(tri->v[i].pos.z > box->vmax.z) box->vmax.z = tri->v[i].pos.z;
+	}
+}
+
 void aabox_union(struct aabox *res, struct aabox *a, struct aabox *b)
 {
 	res->vmin.x = a->vmin.x < b->vmin.x ? a->vmin.x : b->vmin.x;
