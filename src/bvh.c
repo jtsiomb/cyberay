@@ -63,6 +63,8 @@ int build_bvh_sah(struct bvhnode *tree)
 		return 0;
 	}
 
+	printf("split (%d): %d (out of %d)\n", tree->axis, part[best], tree->num_faces);
+
 	/* found the best split, allocate child nodes, split the original array and copy
 	 * the pointers from tribuf to each part
 	 */
@@ -73,13 +75,13 @@ int build_bvh_sah(struct bvhnode *tree)
 		return -1;
 	}
 
-	memcpy(tree->faces, tribuf + best * tree->num_faces, tree->num_faces * sizeof *tribuf);
+	memcpy(tree->faces, tribuf, tree->num_faces * sizeof *tribuf);
 	free(tribuf);
 
 	tree->left->faces = tree->faces;
 	tree->left->num_faces = part[best];
 	tree->right->faces = tree->faces + part[best];
-	tree->right->num_faces = tree->faces - tree->left->faces;
+	tree->right->num_faces = tree->num_faces - part[best];
 
 	tree->num_faces = 0;
 
@@ -91,10 +93,12 @@ int build_bvh_sah(struct bvhnode *tree)
 static float eval_split_cost(struct bvhnode *node, float area, float sp, struct triangle **tribuf, int *part)
 {
 	int i, nleft, nright;
-	float cost, sa_left, sa_right, cost_left, cost_right;
+	float x, sp3, cost, sa_left, sa_right, cost_left, cost_right;
 	struct triangle *tri;
 	struct triangle **pleft, **pright;
 	struct aabox bbleft, bbright;
+
+	sp3 = sp * 3.0f;
 
 	aabox_init(&bbleft);
 	aabox_init(&bbright);
@@ -105,7 +109,10 @@ static float eval_split_cost(struct bvhnode *node, float area, float sp, struct 
 
 	for(i=0; i<node->num_faces; i++) {
 		tri = node->faces[i];
-		if(cgm_velem(&tri->v[0].pos, node->axis) < sp) {
+		x = cgm_velem(&tri->v[0].pos, node->axis);
+		x += cgm_velem(&tri->v[1].pos, node->axis);
+		x += cgm_velem(&tri->v[2].pos, node->axis);
+		if(x < sp3) {
 			aabox_addface(&bbleft, tri);
 			*pleft++ = tri;
 		} else {
@@ -143,6 +150,27 @@ void free_bvh_tree(struct bvhnode *tree)
 	free_bvh_tree(tree->left);
 	free_bvh_tree(tree->right);
 	free(tree);
+}
+
+void print_bvh_tree(struct bvhnode *tree, int lvl)
+{
+	int i;
+	if(!tree) return;
+
+	for(i=0; i<lvl; i++) {
+		fputs("  ", stdout);
+	}
+
+	printf("(%g, %g, %g) -> (%g, %g, %g) ", tree->aabb.vmin.x, tree->aabb.vmin.y,
+			tree->aabb.vmin.z, tree->aabb.vmax.x, tree->aabb.vmax.y, tree->aabb.vmax.z);
+
+	if(tree->num_faces) {
+		printf("leaf: %d triangles\n", tree->num_faces);
+	} else {
+		putchar('\n');
+		print_bvh_tree(tree->left, lvl + 1);
+		print_bvh_tree(tree->right, lvl + 1);
+	}
 }
 
 int ray_bvhnode(cgm_ray *ray, struct bvhnode *bn, float tmax, struct rayhit *hit)

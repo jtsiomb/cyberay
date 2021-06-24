@@ -18,6 +18,7 @@ struct bvhnode {
  */
 int build_bvh_sah(struct bvhnode *tree);
 void free_bvh_tree(struct bvhnode *tree);
+void print_bvh_tree(struct bvhnode *tree, int lvl);
 
 int ray_bvhnode(cgm_ray *ray, struct bvhnode *bn, float tmax, struct rayhit *hit);
 

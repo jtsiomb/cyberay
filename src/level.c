@@ -85,6 +85,8 @@ cont:	node = node->next;
 	}
 	printf("BVH construction took: %lu msec\n", get_msec() - start_time);
 
+	print_bvh_tree(lvl->st_root, 0);
+
 	return 0;
 }
 
