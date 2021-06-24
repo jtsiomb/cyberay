@@ -53,7 +53,7 @@ int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *
 		}	\
 		tmin = t0 > tmin ? t0 : tmin;	\
 		tmax = t1 < tmax ? t1 : tmax;	\
-		if(tmax <= tmin) return 0; \
+		if(tmax < tmin) return 0; \
 	} while(0)
 
 int ray_aabox_any(cgm_ray *ray, struct aabox *box, float tmax)
@@ -110,8 +110,9 @@ float aabox_surf_area(struct aabox *box)
 
 float surf_area(float dx, float dy, float dz)
 {
-	if(dx <= 0 || dy <= 0 || dz <= 0) {
-		return 0.0f;
-	}
+	if(dx < 0.0f) dx = 0.0f;
+	if(dy < 0.0f) dy = 0.0f;
+	if(dz < 0.0f) dz = 0.0f;
+
 	return (dx * dy + dx * dz + dy * dz) * 2.0f;
 }

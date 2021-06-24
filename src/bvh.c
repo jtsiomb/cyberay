@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
+#include <assert.h>
 #include "bvh.h"
 
 #define SPLIT_BUCKETS	8
@@ -9,12 +10,14 @@ static float eval_split_cost(struct bvhnode *node, float area, float sp, struct 
 
 int build_bvh_sah(struct bvhnode *tree)
 {
-	int i, best;
+	int i, best, nleft, nright;
 	float sp, sp0, spgap, area, ext[3];
 	float spcost[SPLIT_BUCKETS];
 	int part[SPLIT_BUCKETS];
 	struct triangle **tribuf;
 	struct aabox *aabb = &tree->aabb;
+
+	assert(tree->num_faces > 0);
 
 	if(tree->left || tree->right) return 0;
 
@@ -24,7 +27,7 @@ int build_bvh_sah(struct bvhnode *tree)
 		aabox_addface(aabb, tree->faces[i]);
 	}
 
-	if(tree->num_faces < 16) {
+	if(tree->num_faces <= 1) {
 		return 0;
 	}
 
@@ -52,41 +55,55 @@ int build_bvh_sah(struct bvhnode *tree)
 
 	best = 0;
 	for(i=1; i<SPLIT_BUCKETS; i++) {
-		if(spcost[i] < spcost[best]) {
+		if(spcost[i] <= spcost[best] && part[i] > 0 && part[i] < tree->num_faces) {
 			best = i;
 		}
 	}
 
-	if(spcost[best] > tree->num_faces) {
-		/* the best split cost is worst than the no-split case */
+	nleft = part[best];
+	nright = tree->num_faces - part[best];
+
+	if(spcost[best] > tree->num_faces || !nleft || !nright) {
+		/* the best split cost is worst than the no-split case, or best split
+		 * actually keeps all triangles under one side and 0 on the other
+		 */
 		free(tribuf);
 		return 0;
-	}
-
-	printf("split (%d): %d (out of %d)\n", tree->axis, part[best], tree->num_faces);
-
-	/* found the best split, allocate child nodes, split the original array and copy
-	 * the pointers from tribuf to each part
-	 */
-	if(!(tree->left = calloc(1, sizeof *tree->left)) || !(tree->right = calloc(1, sizeof *tree->right))) {
-		fprintf(stderr, "failed to allocate tree nodes during BVH construction\n");
-		free(tree->left);
-		free(tribuf);
-		return -1;
 	}
 
 	memcpy(tree->faces, tribuf, tree->num_faces * sizeof *tribuf);
 	free(tribuf);
 
-	tree->left->faces = tree->faces;
-	tree->left->num_faces = part[best];
-	tree->right->faces = tree->faces + part[best];
-	tree->right->num_faces = tree->num_faces - part[best];
+	if(nleft) {
+		if(!(tree->left = calloc(1, sizeof *tree->left))) {
+			fprintf(stderr, "failed to allocate tree nodes during BVH construction\n");
+			return -1;
+		}
+		tree->left->faces = tree->faces;
+		tree->left->num_faces = nleft;
+
+		if(build_bvh_sah(tree->left) == -1) {
+			free(tree->left);
+			return -1;
+		}
+	}
+	if(nright) {
+		if(!(tree->right = calloc(1, sizeof *tree->right))) {
+			fprintf(stderr, "failed to allocate tree nodes during BVH construction\n");
+			free(tree->left);
+			return -1;
+		}
+		tree->right->faces = tree->faces + nleft;
+		tree->right->num_faces = nright;
+
+		if(build_bvh_sah(tree->right) == -1) {
+			free(tree->left);
+			free(tree->right);
+			return -1;
+		}
+	}
 
 	tree->num_faces = 0;
-
-	build_bvh_sah(tree->left);
-	build_bvh_sah(tree->right);
 	return 0;
 }
 
@@ -124,10 +141,10 @@ static float eval_split_cost(struct bvhnode *node, float area, float sp, struct 
 	nleft = pleft - tribuf;
 	nright = node->num_faces - nleft;
 
-	sa_left = aabox_surf_area(&bbleft);
-	sa_right = aabox_surf_area(&bbright);
+	sa_left = nleft ? aabox_surf_area(&bbleft) : 0.0f;
+	sa_right = nright ? aabox_surf_area(&bbright) : 0.0f;
 
-	/* intersection cost = 1, traversal cost = 0.2 * intesection cost */
+	/* intersection cost = 1, traversal cost = 0.125 * intesection cost */
 	cost_left = sa_left * nleft;
 	cost_right = sa_right * nright;
 	cost = 0.125f + (cost_left + cost_right) / area;
