@@ -105,6 +105,11 @@ int main(int argc, char **argv)
 	return 0;
 }
 
+unsigned long get_msec(void)
+{
+	return glutGet(GLUT_ELAPSED_TIME) - start_time;
+}
+
 static int init(void)
 {
 	if(!(tpool = tpool_create(0))) {
@@ -132,7 +137,7 @@ static void cleanup(void)
 {
 	float tsec;
 
-	tsec = (glutGet(GLUT_ELAPSED_TIME) - start_time) / 1000.0f;
+	tsec = get_msec() / 1000.0f;
 	printf("avg framerate: %.2f fps\n", (float)nframes / tsec);
 
 	destroy_level(&lvl);
@@ -149,7 +154,7 @@ static void update(void)
 	unsigned long msec;
 	float dt, vfwd, vright;
 
-	msec = glutGet(GLUT_ELAPSED_TIME) - start_time;
+	msec = get_msec();
 	dt = (float)(msec - prev_upd) / 1000.0f;
 	prev_upd = msec;
 

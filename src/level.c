@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <float.h>
 #include "level.h"
+#include "game.h"
 #include "treestore.h"
 #include "mesh.h"
 
@@ -14,6 +15,7 @@ int load_level(struct level *lvl, const char *fname)
 	struct ts_node *root, *node;
 	struct scenefile scn;
 	struct mesh *mesh, *tail;
+	unsigned long start_time;
 
 	memset(lvl, 0, sizeof *lvl);
 	if(!(lvl->st_root = calloc(1, sizeof *lvl->st_root)) ||
@@ -74,8 +76,15 @@ int load_level(struct level *lvl, const char *fname)
 		}
 cont:	node = node->next;
 	}
-
 	ts_free_tree(root);
+
+	printf("Building static BVH tree\n");
+	start_time = get_msec();
+	if(build_bvh_sah(lvl->st_root) == -1) {
+		return -1;
+	}
+	printf("BVH construction took: %lu msec\n", get_msec() - start_time);
+
 	return 0;
 }
 

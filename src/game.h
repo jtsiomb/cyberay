@@ -12,4 +12,6 @@ extern struct options opt;
 
 int init_options(int argc, char **argv);
 
+unsigned long get_msec(void);
+
 #endif	/* GAME_H_ */

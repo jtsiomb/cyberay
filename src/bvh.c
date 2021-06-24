@@ -81,6 +81,8 @@ int build_bvh_sah(struct bvhnode *tree)
 	tree->right->faces = tree->faces + part[best];
 	tree->right->num_faces = tree->faces - tree->left->faces;
 
+	tree->num_faces = 0;
+
 	build_bvh_sah(tree->left);
 	build_bvh_sah(tree->right);
 	return 0;
@@ -121,7 +123,7 @@ static float eval_split_cost(struct bvhnode *node, float area, float sp, struct 
 	/* intersection cost = 1, traversal cost = 0.2 * intesection cost */
 	cost_left = sa_left * nleft;
 	cost_right = sa_right * nright;
-	cost = 0.2f + (cost_left + cost_right) / area;
+	cost = 0.125f + (cost_left + cost_right) / area;
 
 	*part = nleft;
 	return cost;
@@ -148,26 +150,47 @@ int ray_bvhnode(cgm_ray *ray, struct bvhnode *bn, float tmax, struct rayhit *hit
 	int i, res = 0;
 	struct rayhit hit0;
 
-	if(!ray_aabox_any(ray, &bn->aabb, tmax)) {
+	if(!bn || !ray_aabox_any(ray, &bn->aabb, tmax)) {
 		return 0;
 	}
 
 	if(!hit) {
-		for(i=0; i<bn->num_faces; i++) {
-			if(ray_triangle(ray, bn->faces[i], tmax, 0)) {
-				return 1;
+		if(bn->num_faces) {
+			for(i=0; i<bn->num_faces; i++) {
+				if(ray_triangle(ray, bn->faces[i], tmax, 0)) {
+					return 1;
+				}
 			}
+			return 0;
 		}
-		return 0;
+		return ray_bvhnode(ray, bn->left, tmax, 0) || ray_bvhnode(ray, bn->right, tmax, 0);
 	}
 
 	hit0.t = FLT_MAX;
-	for(i=0; i<bn->num_faces; i++) {
-		if(ray_triangle(ray, bn->faces[i], tmax, hit) && hit->t < hit0.t) {
+
+	if(bn->num_faces) {
+		/* leaf node, intersect faces */
+		for(i=0; i<bn->num_faces; i++) {
+			if(ray_triangle(ray, bn->faces[i], tmax, hit) && hit->t < hit0.t) {
+				hit0 = *hit;
+				res = 1;
+			}
+		}
+	} else {
+		/* internal node, recurse */
+		if(ray_bvhnode(ray, bn->left, tmax, hit)) {
+			hit0 = *hit;
+			res = 1;
+		}
+		if(ray_bvhnode(ray, bn->right, tmax, hit) && hit->t < hit0.t) {
 			hit0 = *hit;
 			res = 1;
 		}
 	}
-	*hit = hit0;
-	return res;
+
+	if(res) {
+		*hit = hit0;
+		return 1;
+	}
+	return 0;
 }
