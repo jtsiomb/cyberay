@@ -8,10 +8,10 @@ dbg = -g
 warn = -pedantic -Wall
 def = -DMINIGLUT_USE_LIBC
 inc = -Ilibs -Ilibs/treestore -Ilibs/miniglut
-libdir = -Llibs/treestore
+libdir = -Llibs/treestore -Llibs/imago
 
 CFLAGS = $(warn) $(opt) $(dbg) $(def) $(inc) -pthread -MMD
-LDFLAGS = $(libgl) $(libs) -lm -pthread -limago -ltreestore
+LDFLAGS = $(libgl) $(libdir) -lm -pthread -limago -ltreestore
 
 libgl = -lGL -lGLU -lX11 -lXext
 
