@@ -7,11 +7,11 @@ opt = -O3 -ffast-math -fno-strict-aliasing
 dbg = -g
 warn = -pedantic -Wall
 def = -DMINIGLUT_USE_LIBC
-inc = -Ilibs -Ilibs/treestore -Ilibs/miniglut
-libdir = -Llibs/treestore -Llibs/imago
+inc = -Ilibs -Ilibs/treestore -Ilibs/miniglut -Ilibs/drawtext
+libdir = -Llibs/treestore -Llibs/imago -Llibs/drawtext
 
 CFLAGS = $(warn) $(opt) $(dbg) $(def) $(inc) -pthread -MMD
-LDFLAGS = $(libgl) $(libdir) -lm -pthread -limago -ltreestore
+LDFLAGS = $(libgl) $(libdir) -lm -pthread -limago -ltreestore -ldrawtext
 
 libgl = -lGL -lGLU -lX11 -lXext
 
