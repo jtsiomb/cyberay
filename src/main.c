@@ -38,6 +38,7 @@ static void cleanup(void);
 static void display(void);
 static void idle(void);
 static void reshape(int x, int y);
+static void resizefb(int x, int y);
 static void keydown(unsigned char key, int x, int y);
 static void keyup(unsigned char key, int x, int y);
 static void skeydown(int key, int x, int y);
@@ -61,6 +62,10 @@ static int keymap[NUM_INPUTS][2] = {
 	{'a', KEY_LEFT},
 	{' ', 0}
 };
+
+static int win_width, win_height;
+static float win_aspect;
+static int auto_res;
 
 static unsigned int tex;
 static int tex_width, tex_height;
@@ -216,6 +221,18 @@ static void idle(void)
 static void reshape(int x, int y)
 {
 	glViewport(0, 0, x, y);
+	win_width = x;
+	win_height = y;
+	win_aspect = (float)x / (float)y;
+
+	if(auto_res || !tex_width) {
+		resizefb(x, y);
+	}
+}
+
+static void resizefb(int x, int y)
+{
+	printf("resize framebuffer: %dx%d\n", x, y);
 
 	if(x > tex_width || y > tex_height) {
 		tex_width = nextpow2(x);
@@ -239,6 +256,30 @@ static void keyb(int key, int press)
 		if(keymap[i][0] == key || keymap[i][1] == key) {
 			inpstate[i] = press;
 		}
+	}
+
+	if(press) {
+		switch(key) {
+		case '=':
+			resizefb(3 * fb.width / 2, 3 * fb.height / 2);
+			if(win_width < fb.width || win_height < fb.height) {
+				glutReshapeWindow(fb.width, fb.height);
+			}
+			break;
+
+		case '-':
+			resizefb(2 * fb.width / 3, 2 * fb.height / 3);
+			break;
+
+		case '0':
+			auto_res ^= 1;
+			printf("%s resolution\n", auto_res ? "auto" : "manual");
+			if(auto_res && (fb.width != win_width || fb.height != win_height)) {
+				resizefb(win_width, win_height);
+			}
+			break;
+		}
+
 	}
 }
 
