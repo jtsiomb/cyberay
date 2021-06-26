@@ -5,6 +5,7 @@
 
 struct options {
 	int width, height;
+	float scale;
 };
 
 extern struct level lvl;

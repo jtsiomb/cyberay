@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	glutInitWindowSize(opt.width, opt.height);
+	glutInitWindowSize(opt.width * opt.scale, opt.height * opt.scale);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutCreateWindow("cyberay");
 
@@ -135,6 +135,8 @@ static int init(void)
 	if(load_level(&lvl, "data/test.lvl") == -1) {
 		return -1;
 	}
+
+	resizefb(opt.width, opt.height);
 	return 0;
 }
 
@@ -225,7 +227,7 @@ static void reshape(int x, int y)
 	win_height = y;
 	win_aspect = (float)x / (float)y;
 
-	if(auto_res || !tex_width) {
+	if(auto_res) {
 		resizefb(x, y);
 	}
 }
