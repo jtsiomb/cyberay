@@ -18,9 +18,9 @@ struct framebuffer {
 	cgm_vec3 *pixels;
 };
 
-extern struct framebuffer fb;
-extern struct thread_pool *tpool;
-extern float view_xform[16];
+struct framebuffer fb;
+struct thread_pool *tpool;
+float view_xform[16];
 
 int fbsize(int width, int height);
 

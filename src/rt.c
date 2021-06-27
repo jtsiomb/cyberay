@@ -10,9 +10,6 @@ struct tile {
 	cgm_vec3 *fbptr;
 };
 
-struct framebuffer fb;
-struct thread_pool *tpool;
-float view_xform[16];
 float vfov = M_PI / 4;
 
 static float aspect;

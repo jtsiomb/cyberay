@@ -1,14 +1,12 @@
 #include "game.h"
 #include "optcfg.h"
 
-struct level lvl;
-struct options opt;
-
-enum { OPT_SIZE, OPT_SCALE, OPT_HELP };
+enum { OPT_SIZE, OPT_SCALE, OPT_NTHREADS, OPT_HELP };
 
 static struct optcfg_option options[] = {
 	{'s', "size", OPT_SIZE, "rendering resolution (WxH)"},
 	{0, "scale", OPT_SCALE, "output scale factor"},
+	{'t', "threads", OPT_NTHREADS, "number of worker threads to use for rendering (0 means auto-detect)"},
 	{'h', "help", OPT_HELP, "print usage and exit"},
 	OPTCFG_OPTIONS_END
 };
@@ -22,6 +20,7 @@ int init_options(int argc, char **argv)
 	opt.width = 1280;
 	opt.height = 800;
 	opt.scale = 1.0f;
+	opt.nthreads = 0;
 
 	optcfg = optcfg_init(options);
 	optcfg_set_opt_callback(optcfg, opt_handler, argv[0]);
@@ -50,6 +49,13 @@ static int opt_handler(struct optcfg *o, int optid, void *cls)
 		if(!(val = optcfg_next_value(o)) || optcfg_float_value(val, &opt.scale) == -1 ||
 				opt.scale <= 0.0f) {
 			fprintf(stderr, "scale: expected a positive number\n");
+			return -1;
+		}
+		break;
+
+	case OPT_NTHREADS:
+		if(!(val = optcfg_next_value(o)) || optcfg_int_value(val, &opt.nthreads) < 0) {
+			fprintf(stderr, "threads: expected a positive number or 0 for auto-detect\n");
 			return -1;
 		}
 		break;

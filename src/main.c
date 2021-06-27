@@ -6,6 +6,7 @@
 #include "game.h"
 #include "level.h"
 #include "rt.h"
+#include "statui.h"
 
 enum {
 	KEY_F1		= GLUT_KEY_F1 | 0x100,
@@ -63,8 +64,6 @@ static int keymap[NUM_INPUTS][2] = {
 	{' ', 0}
 };
 
-static int win_width, win_height;
-static float win_aspect;
 static int auto_res;
 
 static unsigned int tex;
@@ -117,13 +116,17 @@ unsigned long get_msec(void)
 
 static int init(void)
 {
-	if(!(tpool = tpool_create(0))) {
+	if(!(uifont = dtx_open_font_glyphmap("data/serif.glyphmap"))) {
+		fprintf(stderr, "failed to load font\n");
+		return -1;
+	}
+
+	if(!(tpool = tpool_create(opt.nthreads))) {
 		fprintf(stderr, "failed to create thread pool\n");
 		return -1;
 	}
 
 	glEnable(GL_CULL_FACE);
-
 
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -137,6 +140,7 @@ static int init(void)
 	}
 
 	resizefb(opt.width, opt.height);
+	init_statui();
 	return 0;
 }
 
@@ -151,7 +155,11 @@ static void cleanup(void)
 
 	glDeleteTextures(1, &tex);
 
+	destroy_statui();
+
 	tpool_destroy(tpool);
+
+	dtx_close_font(uifont);
 }
 
 #define WALK_SPEED 3.0f
@@ -208,6 +216,8 @@ static void display(void)
 	glTexCoord2f(0, 0);
 	glVertex2f(-1, 1);
 	glEnd();
+
+	draw_statui();
 
 	glutSwapBuffers();
 	assert(glGetError() == GL_NO_ERROR);
