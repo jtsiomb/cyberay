@@ -100,7 +100,7 @@ void draw_statui(void)
 		dtx_printf("cpu %2d: %3d%%", i, usage[i]);
 		x += label_width;
 
-		if(x >= vscr_width) {
+		if(x + label_width >= vscr_width) {
 			x = 10;
 			y -= font_height * 2;
 		}
