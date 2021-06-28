@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <GL/gl.h>
@@ -8,14 +9,13 @@
 #include "drawtext.h"
 #include "game.h"
 
-#define VSCR_HEIGHT		512
+#define VSCR_HEIGHT		600
 #define VSCR_WIDTH		(VSCR_HEIGHT * win_aspect)
 
 static int *usage;
 static int nproc;
 static pthread_t updthr;
-static int quit;
-static FILE *fp;
+static int quit, enabled;
 
 static float font_height, label_width;
 
@@ -23,10 +23,6 @@ static void *update_stat(void *cls);
 
 int init_statui(void)
 {
-	if(!(fp = fopen("/proc/stat", "r"))) {
-		return -1;
-	}
-
 	nproc = tpool_num_processors();
 	if(!(usage = calloc(nproc, sizeof *usage))) {
 		perror("init_statui");
@@ -52,14 +48,21 @@ void destroy_statui(void)
 		quit = 1;
 		pthread_join(updthr, 0);
 	}
+}
 
-	if(fp) fclose(fp);
+void show_statui(int show)
+{
+	enabled = show;
 }
 
 void draw_statui(void)
 {
 	int i;
-	float x, y, vscr_width = VSCR_WIDTH;
+	float x, y, vscr_width;
+
+	if(!enabled) return;
+
+	vscr_width = VSCR_WIDTH;
 
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
@@ -72,12 +75,26 @@ void draw_statui(void)
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glTranslatef(0, font_height, 0);
 
+	glDisable(GL_TEXTURE_2D);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ZERO, GL_SRC_COLOR);
+
+	glBegin(GL_QUADS);
+	glColor3f(0.5, 0.5, 0.5);
+	glVertex2f(0, 0);
+	glVertex2f(VSCR_WIDTH, 0);
+	glVertex2f(VSCR_WIDTH, VSCR_HEIGHT);
+	glVertex2f(0, VSCR_HEIGHT);
+	glEnd();
+
+	glDisable(GL_BLEND);
+
+	glColor3f(1, 1, 1);
 	dtx_use_font(uifont, UIFONT_SZ);
 
 	x = 10;
-	y = VSCR_HEIGHT - font_height * 2;
+	y = VSCR_HEIGHT - font_height;
 	for(i=0; i<nproc; i++) {
 		dtx_position(x, y);
 		dtx_printf("cpu %2d: %3d%%", i, usage[i]);
@@ -100,36 +117,62 @@ void draw_statui(void)
 	glLoadIdentity();
 }
 
+enum { USER, NICE, SYS, IDLE, IOWAIT, IRQ, SOFTIRQ, MAX_STATS };
+
+struct cpustat {
+	int64_t cnt[2][MAX_STATS];
+};
+
 static void *update_stat(void *cls)
 {
-	int i, cpu;
-	unsigned long val[7], delta[7], sum;
-	static unsigned long prev[7];
-	char buf[256];
+	int i, cpu, cur = 0;
+	struct cpustat *cpustat, *st;
+	long delta[MAX_STATS], sum;
+	char buf[256], *ptr, *endp;
+	FILE *fp;
+
+	cpustat = alloca(nproc * sizeof *cpustat);
+	memset(cpustat, 0, nproc * sizeof *cpustat);
 
 	while(!quit) {
-		rewind(fp);
+		if(enabled) {
+			usleep(500000);
+		} else {
+			usleep(1000000);
+			continue;
+		}
+
+		if(!(fp = fopen("/proc/stat", "r"))) {
+			return 0;
+		}
 
 		while(fgets(buf, sizeof buf, fp)) {
-			if(sscanf(buf, "cpu%d %lu %lu %lu %lu %lu %lu %lu", &cpu, val, val + 1,
-						val + 2, val + 3, val + 4, val + 5, val + 6) == 8) {
-				if(cpu < 0 || cpu >= nproc) continue;
+			if(sscanf(buf, "cpu%d", &cpu) == 1 && cpu >= 0 && cpu < nproc) {
+				ptr = buf;
+				while(*ptr && !isspace(*ptr)) ptr++;
+
+				st = cpustat + cpu;
 
 				sum = 0;
-				for(i=0; i<7; i++) {
-					delta[i] = val[i] - prev[i];
+				for(i=0; i<MAX_STATS; i++) {
+					st->cnt[cur][i] = strtoll(ptr, &endp, 10);
+					ptr = endp;
+
+					delta[i] = st->cnt[cur][i] - st->cnt[cur ^ 1][i];
+					if(delta[i] < 0) delta[i] = 0;
 					sum += delta[i];
 				}
 
 				if(sum) {
-					usage[cpu] = 100 - delta[3] * 100 / sum;
+					usage[cpu] = 100 * (sum - delta[IDLE]) / sum;
 				}
 
 				if(cpu == nproc - 1) break;
 			}
 		}
 
-		usleep(500000);
+		cur ^= 1;
+		fclose(fp);
 	}
 
 	return 0;

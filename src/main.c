@@ -207,6 +207,7 @@ static void display(void)
 	glEnable(GL_TEXTURE_2D);
 
 	glBegin(GL_QUADS);
+	glColor3f(1, 1, 1);
 	glTexCoord2f(0, 1);
 	glVertex2f(-1, -1);
 	glTexCoord2f(1, 1);
@@ -263,6 +264,7 @@ static void resizefb(int x, int y)
 static void keyb(int key, int press)
 {
 	int i;
+	static int showstat;
 
 	for(i=0; i<NUM_INPUTS; i++) {
 		if(keymap[i][0] == key || keymap[i][1] == key) {
@@ -289,6 +291,11 @@ static void keyb(int key, int press)
 			if(auto_res && (fb.width != win_width || fb.height != win_height)) {
 				resizefb(win_width, win_height);
 			}
+			break;
+
+		case '`':
+			showstat ^= 1;
+			show_statui(showstat);
 			break;
 		}
 
