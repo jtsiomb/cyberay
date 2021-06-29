@@ -10,7 +10,7 @@ struct facevertex {
 
 struct objmtl {
 	char name[64];
-	cgm_vec3 ka, kd, ks;
+	cgm_vec3 ka, kd, ks, ke;
 	float shin;
 	float alpha;
 	float ior;
@@ -361,6 +361,14 @@ static struct objmtl *load_mtllib(const char *objfname, const char *mtlfname)
 			if(m) {
 				sscanf(line + 3, "%f %f %f", &m->kd.x, &m->kd.y, &m->kd.z);
 			}
+		} else if(memcmp(line, "Ks", 2) == 0) {
+			if(m) {
+				sscanf(line + 3, "%f %f %f", &m->ks.x, &m->ks.y, &m->ks.z);
+			}
+		} else if(memcmp(line, "Ke", 2) == 0) {
+			if(m) {
+				sscanf(line + 3, "%f %f %f", &m->ke.x, &m->ke.y, &m->ke.z);
+			}
 		}
 	}
 
@@ -385,5 +393,6 @@ static void free_mtllist(struct objmtl *mtl)
 static void conv_mtl(struct material *mm, struct objmtl *om)
 {
 	mm->color = om->kd;
+	mm->emit = om->ke;
 	/* TODO */
 }

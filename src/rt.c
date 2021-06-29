@@ -118,7 +118,7 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 	cgm_vec3 rcol;
 	cgm_ray ray;
 
-	color->x = color->y = color->z = 0.0f;
+	*color = hit->mtl->emit;
 
 	/* pick diffuse direction */
 	cgm_sphrand(&v, 1.0f);

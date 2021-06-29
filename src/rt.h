@@ -6,7 +6,7 @@
 #include "tpool.h"
 
 struct material {
-	cgm_vec3 color;
+	cgm_vec3 color, emit;
 	float roughness;
 	float ior;
 
