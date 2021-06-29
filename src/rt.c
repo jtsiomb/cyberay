@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <float.h>
 #include "rt.h"
 #include "game.h"
@@ -17,8 +18,9 @@ static struct tile *tiles;
 static int num_tiles;
 
 static void render_tile(struct tile *tile);
-static void ray_trace(cgm_vec3 *color, cgm_ray *ray);
+static void ray_trace(cgm_vec3 *color, cgm_ray *ray, float energy, int max_iter);
 static void bgcolor(cgm_vec3 *color, cgm_ray *ray);
+static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter);
 static void primary_ray(cgm_ray *ray, int x, int y, int sample);
 
 int fbsize(int width, int height)
@@ -87,20 +89,18 @@ static void render_tile(struct tile *tile)
 	for(i=0; i<tile->height; i++) {
 		for(j=0; j<tile->width; j++) {
 			primary_ray(&ray, tile->x + j, tile->y + i, tile->sample);
-			ray_trace(fbptr + j, &ray);
+			ray_trace(fbptr + j, &ray, 1.0f, opt.max_iter);
 		}
 		fbptr += fb.width;
 	}
 }
 
-static void ray_trace(cgm_vec3 *color, cgm_ray *ray)
+static void ray_trace(cgm_vec3 *color, cgm_ray *ray, float energy, int max_iter)
 {
 	struct rayhit hit;
 
-	if(ray_level(ray, &lvl, FLT_MAX, &hit)) {
-		color->x = hit.v.norm.x * 0.5 + 0.5;
-		color->y = hit.v.norm.y * 0.5 + 0.5;
-		color->z = hit.v.norm.z * 0.5 + 0.5;
+	if(max_iter && ray_level(ray, &lvl, FLT_MAX, &hit)) {
+		shade(color, &hit, energy, max_iter);
 	} else {
 		bgcolor(color, ray);
 	}
@@ -109,6 +109,32 @@ static void ray_trace(cgm_vec3 *color, cgm_ray *ray)
 static void bgcolor(cgm_vec3 *color, cgm_ray *ray)
 {
 	color->x = color->y = color->z = 1.0f;
+}
+
+static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter)
+{
+	cgm_vec3 v;
+	float pdiff, pspec, dp, rval, re;
+	cgm_vec3 rcol;
+	cgm_ray ray;
+
+	color->x = color->y = color->z = 0.0f;
+
+	/* pick diffuse direction */
+	cgm_sphrand(&v, 1.0f);
+	v.x += hit->v.pos.x + hit->v.norm.x;
+	v.y += hit->v.pos.y + hit->v.norm.y;
+	v.z += hit->v.pos.z + hit->v.norm.z;
+	dp = cgm_vdot(&v, &hit->v.norm);
+
+	rval = (float)rand() / (float)RAND_MAX;
+
+	if(rval < (re = dp * energy)) {
+		ray.origin = hit->v.pos;
+		ray.dir = v;
+		ray_trace(&rcol, &ray, re, max_iter - 1);
+		cgm_vadd(color, &rcol);
+	}
 }
 
 static void primary_ray(cgm_ray *ray, int x, int y, int sample)

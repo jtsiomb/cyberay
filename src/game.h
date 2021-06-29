@@ -8,6 +8,7 @@ struct options {
 	int width, height;
 	float scale;
 	int nthreads;
+	int max_iter;
 };
 
 int win_width, win_height;
