@@ -3,6 +3,7 @@
 #include "disp.h"
 #include "rt.h"
 #include "sdr.h"
+#include "game.h"
 
 
 static unsigned int tex;
@@ -11,12 +12,15 @@ static int tex_intfmt;
 static float tex_xform[16];
 
 static unsigned int sdr;
+static int uloc_inv_gamma;
 
 static unsigned int nextpow2(unsigned int x);
 
 
 int init_display(void)
 {
+	float inv_gamma;
+
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -26,6 +30,13 @@ int init_display(void)
 
 	if(!(sdr = create_program_load("sdr/vertex.glsl", "sdr/pixel.glsl"))) {
 		return -1;
+	}
+
+	if((uloc_inv_gamma = get_uniform_loc(sdr, "inv_gamma")) != -1) {
+		inv_gamma = 1.0f / opt.gamma;
+		glUseProgram(sdr);
+		glUniform3f(uloc_inv_gamma, inv_gamma, inv_gamma, inv_gamma);
+		glUseProgram(0);
 	}
 
 	return 0;

@@ -10,6 +10,7 @@ struct options {
 	int nthreads;
 	int max_iter;
 	int nsamples;
+	float gamma;
 };
 
 int win_width, win_height;
