@@ -8,7 +8,7 @@
 struct tile {
 	int x, y, width, height;
 	int sample;
-	cgm_vec3 *fbptr;
+	cgm_vec4 *fbptr;
 };
 
 float vfov = M_PI / 4;
@@ -25,8 +25,8 @@ static void primary_ray(cgm_ray *ray, int x, int y, int sample);
 
 int fbsize(int width, int height)
 {
-	int i, j, x, y, xtiles, ytiles;
-	cgm_vec3 *fbptr;
+	int i, j, k, x, y, xtiles, ytiles;
+	cgm_vec4 *fbptr;
 	struct tile *tileptr;
 
 	if(!(fbptr = malloc(width * height * sizeof *fb.pixels))) {
@@ -34,7 +34,7 @@ int fbsize(int width, int height)
 	}
 	xtiles = (width + TILESZ - 1) / TILESZ;
 	ytiles = (height + TILESZ - 1) / TILESZ;
-	if(!(tileptr = malloc(xtiles * ytiles * sizeof *tiles))) {
+	if(!(tileptr = malloc(xtiles * ytiles * opt.nsamples * sizeof *tiles))) {
 		free(fbptr);
 		return -1;
 	}
@@ -46,7 +46,7 @@ int fbsize(int width, int height)
 
 	free(tiles);
 	tiles = tileptr;
-	num_tiles = xtiles * ytiles;
+	num_tiles = xtiles * ytiles * opt.nsamples;
 
 	aspect = (float)fb.width / (float)fb.height;
 
@@ -54,13 +54,16 @@ int fbsize(int width, int height)
 	for(i=0; i<ytiles; i++) {
 		x = 0;
 		for(j=0; j<xtiles; j++) {
-			tileptr->x = x;
-			tileptr->y = y;
-			tileptr->width = width - x < TILESZ ? width - x : TILESZ;
-			tileptr->height = height - y < TILESZ ? height - y : TILESZ;
-			tileptr->fbptr = fbptr + x;
-			tileptr++;
+			for(k=0; k<opt.nsamples; k++) {
+				tileptr->x = x;
+				tileptr->y = y;
+				tileptr->width = width - x < TILESZ ? width - x : TILESZ;
+				tileptr->height = height - y < TILESZ ? height - y : TILESZ;
+				tileptr->fbptr = fbptr + x;
+				tileptr->sample = k;
+				tileptr++;
 
+			}
 			x += TILESZ;
 		}
 		fbptr += width * TILESZ;
@@ -84,12 +87,22 @@ static void render_tile(struct tile *tile)
 {
 	int i, j;
 	cgm_ray ray;
-	cgm_vec3 *fbptr = tile->fbptr;
+	cgm_vec3 col;
+	cgm_vec4 *fbptr = tile->fbptr;
 
 	for(i=0; i<tile->height; i++) {
 		for(j=0; j<tile->width; j++) {
 			primary_ray(&ray, tile->x + j, tile->y + i, tile->sample);
-			ray_trace(fbptr + j, &ray, 1.0f, opt.max_iter);
+			if(tile->sample) {
+				ray_trace(&col, &ray, 1.0f, opt.max_iter);
+				fbptr[j].x += col.x;
+				fbptr[j].y += col.y;
+				fbptr[j].z += col.z;
+				fbptr[j].w++;
+			} else {
+				ray_trace((cgm_vec3*)(fbptr + j), &ray, 1.0f, opt.max_iter);
+				fbptr[j].w = 1;
+			}
 		}
 		fbptr += fb.width;
 	}

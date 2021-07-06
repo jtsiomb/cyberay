@@ -9,6 +9,7 @@ struct options {
 	float scale;
 	int nthreads;
 	int max_iter;
+	int nsamples;
 };
 
 int win_width, win_height;

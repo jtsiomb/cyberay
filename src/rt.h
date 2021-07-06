@@ -15,7 +15,7 @@ struct material {
 
 struct framebuffer {
 	int width, height;
-	cgm_vec3 *pixels;
+	cgm_vec4 *pixels;
 };
 
 struct framebuffer fb;

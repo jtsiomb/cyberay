@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <cgmath/cgmath.h>
+#include "opengl.h"
 #include "miniglut.h"
 #include "game.h"
+#include "disp.h"
 #include "level.h"
 #include "rt.h"
 #include "statui.h"
@@ -36,7 +38,7 @@ enum { INP_FWD, INP_BACK, INP_RIGHT, INP_LEFT, INP_FIRE, NUM_INPUTS };
 
 static int init(void);
 static void cleanup(void);
-static void display(void);
+static void disp(void);
 static void idle(void);
 static void reshape(int x, int y);
 static void resizefb(int x, int y);
@@ -46,7 +48,6 @@ static void skeydown(int key, int x, int y);
 static void skeyup(int key, int x, int y);
 static void mouse(int bn, int st, int x, int y);
 static void motion(int x, int y);
-static unsigned int nextpow2(unsigned int x);
 
 static float cam_theta, cam_phi;
 static cgm_vec3 cam_pos = {0, 1.6, 0};
@@ -66,11 +67,6 @@ static int keymap[NUM_INPUTS][2] = {
 
 static int auto_res;
 
-static unsigned int tex;
-static int tex_width, tex_height;
-static int tex_intfmt;
-static float tex_xform[16];
-
 static unsigned long nframes;
 static unsigned long start_time;
 
@@ -87,7 +83,7 @@ int main(int argc, char **argv)
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutCreateWindow("cyberay");
 
-	glutDisplayFunc(display);
+	glutDisplayFunc(disp);
 	glutIdleFunc(idle);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keydown);
@@ -116,6 +112,14 @@ unsigned long get_msec(void)
 
 static int init(void)
 {
+	if(init_opengl() == -1) {
+		return -1;
+	}
+	if(!glcaps.sdr) {
+		fprintf(stderr, "OpenGL shader support required\n");
+		return -1;
+	}
+
 	if(!(uifont = dtx_open_font_glyphmap("data/serif.glyphmap"))) {
 		fprintf(stderr, "failed to load font\n");
 		return -1;
@@ -128,12 +132,9 @@ static int init(void)
 
 	glEnable(GL_CULL_FACE);
 
-	glGenTextures(1, &tex);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	tex_intfmt = GL_RGB16F;
+	if(init_display() == -1) {
+		return -1;
+	}
 
 	if(load_level(&lvl, "data/test.lvl") == -1) {
 		return -1;
@@ -153,7 +154,7 @@ static void cleanup(void)
 
 	destroy_level(&lvl);
 
-	glDeleteTextures(1, &tex);
+	cleanup_display();
 
 	destroy_statui();
 
@@ -197,27 +198,12 @@ static void update(void)
 	cgm_mtranslate(view_xform, cam_pos.x, cam_pos.y, cam_pos.z);
 }
 
-static void display(void)
+static void disp(void)
 {
 	update();
 
 	render();
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fb.width, fb.height, GL_RGB, GL_FLOAT, fb.pixels);
-	glEnable(GL_TEXTURE_2D);
-
-	glBegin(GL_QUADS);
-	glColor3f(1, 1, 1);
-	glTexCoord2f(0, 1);
-	glVertex2f(-1, -1);
-	glTexCoord2f(1, 1);
-	glVertex2f(1, -1);
-	glTexCoord2f(1, 0);
-	glVertex2f(1, 1);
-	glTexCoord2f(0, 0);
-	glVertex2f(-1, 1);
-	glEnd();
-
+	display();
 	draw_statui();
 
 	glutSwapBuffers();
@@ -247,18 +233,8 @@ static void resizefb(int x, int y)
 {
 	printf("resize framebuffer: %dx%d\n", x, y);
 
-	if(x > tex_width || y > tex_height) {
-		tex_width = nextpow2(x);
-		tex_height = nextpow2(y);
-
-		glBindTexture(GL_TEXTURE_2D, tex);
-		glTexImage2D(GL_TEXTURE_2D, 0, tex_intfmt, tex_width, tex_height, 0, GL_RGB, GL_FLOAT, 0);
-	}
+	resize_display(x, y);
 	fbsize(x, y);
-	cgm_mscaling(tex_xform, (float)x / tex_width, (float)y / tex_height, 1.0f);
-
-	glMatrixMode(GL_TEXTURE);
-	glLoadMatrixf(tex_xform);
 }
 
 static void keyb(int key, int press)
@@ -348,13 +324,3 @@ static void motion(int x, int y)
 	}
 }
 
-static unsigned int nextpow2(unsigned int x)
-{
-	x--;
-	x |= x >> 1;
-	x |= x >> 2;
-	x |= x >> 4;
-	x |= x >> 8;
-	x |= x >> 16;
-	return x + 1;
-}

@@ -1,0 +1,45 @@
+#ifndef OPENGL_H_
+#define OPENGL_H_
+
+#include <GL/gl.h>
+
+#ifndef GL_VERSION_2_0
+#define LOADEXT_SDR
+#endif
+
+#include <GL/glext.h>
+
+struct glcaps {
+	int ver_major, ver_minor;
+	int sdr;
+} glcaps;
+
+#ifndef LOADEXT_SDR
+PFNGLCREATEPROGRAMPROC glCreateProgram;
+PFNGLDELETEPROGRAMPROC glDeleteProgram;
+PFNGLATTACHSHADERPROC glAttachShader;
+PFNGLLINKPROGRAMPROC glLinkProgram;
+PFNGLGETPROGRAMIVPROC glGetProgramiv;
+PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLog;
+PFNGLUSEPROGRAMPROC glUseProgram;
+PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
+PFNGLUNIFORM1IPROC glUniform1i;
+PFNGLUNIFORM1FPROC glUniform1f;
+PFNGLUNIFORM2FPROC glUniform2f;
+PFNGLUNIFORM3FPROC glUniform3f;
+PFNGLUNIFORM4FPROC glUniform4f;
+PFNGLUNIFORMMATRIX4FVPROC glUniformMatrix4fv;
+PFNGLGETATTRIBLOCATIONPROC glGetAttribLocation;
+PFNGLVERTEXATTRIB3FPROC glVertexAttrib3f;
+PFNGLCREATESHADERPROC glCreateShader;
+PFNGLDELETESHADERPROC glDeleteShader;
+PFNGLSHADERSOURCEPROC glShaderSource;
+PFNGLCOMPILESHADERPROC glCompileShader;
+PFNGLGETSHADERIVPROC glGetShaderiv;
+PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog;
+#endif
+
+int init_opengl(void);
+
+
+#endif	/* OPENGL_H_ */
