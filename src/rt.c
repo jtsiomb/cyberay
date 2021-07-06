@@ -3,8 +3,6 @@
 #include "rt.h"
 #include "game.h"
 
-#define TILESZ	32
-
 struct tile {
 	int x, y, width, height;
 	int sample;
@@ -32,8 +30,8 @@ int fbsize(int width, int height)
 	if(!(fbptr = malloc(width * height * sizeof *fb.pixels))) {
 		return -1;
 	}
-	xtiles = (width + TILESZ - 1) / TILESZ;
-	ytiles = (height + TILESZ - 1) / TILESZ;
+	xtiles = (width + opt.tilesz - 1) / opt.tilesz;
+	ytiles = (height + opt.tilesz - 1) / opt.tilesz;
 	if(!(tileptr = malloc(xtiles * ytiles * opt.nsamples * sizeof *tiles))) {
 		free(fbptr);
 		return -1;
@@ -57,17 +55,17 @@ int fbsize(int width, int height)
 			for(k=0; k<opt.nsamples; k++) {
 				tileptr->x = x;
 				tileptr->y = y;
-				tileptr->width = width - x < TILESZ ? width - x : TILESZ;
-				tileptr->height = height - y < TILESZ ? height - y : TILESZ;
+				tileptr->width = width - x < opt.tilesz ? width - x : opt.tilesz;
+				tileptr->height = height - y < opt.tilesz ? height - y : opt.tilesz;
 				tileptr->fbptr = fbptr + x;
 				tileptr->sample = k;
 				tileptr++;
 
 			}
-			x += TILESZ;
+			x += opt.tilesz;
 		}
-		fbptr += width * TILESZ;
-		y += TILESZ;
+		fbptr += width * opt.tilesz;
+		y += opt.tilesz;
 	}
 
 	return 0;

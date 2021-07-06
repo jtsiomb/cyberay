@@ -8,6 +8,7 @@ struct options {
 	int width, height;
 	float scale;
 	int nthreads;
+	int tilesz;
 	int max_iter;
 	int nsamples;
 	float gamma;

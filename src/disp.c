@@ -32,7 +32,7 @@ int init_display(void)
 		return -1;
 	}
 
-	if((uloc_inv_gamma = get_uniform_loc(sdr, "inv_gamma")) != -1) {
+	if((uloc_inv_gamma = glGetUniformLocation(sdr, "inv_gamma")) != -1) {
 		inv_gamma = 1.0f / opt.gamma;
 		glUseProgram(sdr);
 		glUniform3f(uloc_inv_gamma, inv_gamma, inv_gamma, inv_gamma);

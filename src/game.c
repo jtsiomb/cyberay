@@ -1,12 +1,13 @@
 #include "game.h"
 #include "optcfg.h"
 
-enum { OPT_SIZE, OPT_SCALE, OPT_NTHREADS, OPT_ITER, OPT_SAMPLES, OPT_GAMMA, OPT_HELP };
+enum { OPT_SIZE, OPT_SCALE, OPT_NTHREADS, OPT_TILESZ, OPT_ITER, OPT_SAMPLES, OPT_GAMMA, OPT_HELP };
 
 static struct optcfg_option options[] = {
 	{'s', "size", OPT_SIZE, "rendering resolution (WxH)"},
 	{0, "scale", OPT_SCALE, "output scale factor"},
 	{'t', "threads", OPT_NTHREADS, "number of worker threads to use for rendering (0 means auto-detect)"},
+	{'T', "tile", OPT_TILESZ, "render tile size"},
 	{0, "iter", OPT_ITER, "maximum recursion depth"},
 	{'S', "samples", OPT_SAMPLES, "number of samples per pixel"},
 	{0, "gamma", OPT_GAMMA, "output gamma"},
@@ -24,6 +25,7 @@ int init_options(int argc, char **argv)
 	opt.height = 800;
 	opt.scale = 1.0f;
 	opt.nthreads = 0;
+	opt.tilesz = 32;
 	opt.max_iter = 6;
 	opt.nsamples = 2;
 	opt.gamma = 2.2;
@@ -63,6 +65,14 @@ static int opt_handler(struct optcfg *o, int optid, void *cls)
 		if(!(val = optcfg_next_value(o)) || optcfg_int_value(val, &opt.nthreads) == -1 ||
 				opt.nthreads < 0) {
 			fprintf(stderr, "threads: expected a positive number or 0 for auto-detect\n");
+			return -1;
+		}
+		break;
+
+	case OPT_TILESZ:
+		if(!(val = optcfg_next_value(o)) || optcfg_int_value(val, &opt.tilesz) == -1 ||
+				opt.tilesz <= 0) {
+			fprintf(stderr, "tile: expected a render tile size value\n");
 			return -1;
 		}
 		break;
