@@ -49,6 +49,8 @@ static void skeyup(int key, int x, int y);
 static void mouse(int bn, int st, int x, int y);
 static void motion(int x, int y);
 
+static int cur_sample;
+
 static float cam_theta, cam_phi;
 static cgm_vec3 cam_pos = {0, 1.6, 0};
 
@@ -178,15 +180,19 @@ static void update(void)
 
 	if(inpstate[INP_FWD]) {
 		vfwd -= WALK_SPEED * dt;
+		cur_sample = 0;
 	}
 	if(inpstate[INP_BACK]) {
 		vfwd += WALK_SPEED * dt;
+		cur_sample = 0;
 	}
 	if(inpstate[INP_RIGHT]) {
 		vright += WALK_SPEED * dt;
+		cur_sample = 0;
 	}
 	if(inpstate[INP_LEFT]) {
 		vright -= WALK_SPEED * dt;
+		cur_sample = 0;
 	}
 
 	cam_pos.x += cos(cam_theta) * vright + sin(cam_theta) * vfwd;
@@ -202,7 +208,7 @@ static void disp(void)
 {
 	update();
 
-	render();
+	render(cur_sample++);
 	display();
 	draw_statui();
 
@@ -321,6 +327,8 @@ static void motion(int x, int y)
 
 		if(cam_phi < -M_PI) cam_phi = -M_PI;
 		if(cam_phi > M_PI) cam_phi = M_PI;
+
+		cur_sample = 0;
 	}
 }
 

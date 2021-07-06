@@ -24,6 +24,6 @@ float view_xform[16];
 
 int fbsize(int width, int height);
 
-void render(void);
+void render(int samplenum);
 
 #endif	/* RT_H_ */

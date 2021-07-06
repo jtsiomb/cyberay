@@ -23,7 +23,7 @@ static void primary_ray(cgm_ray *ray, int x, int y, int sample);
 
 int fbsize(int width, int height)
 {
-	int i, j, k, x, y, xtiles, ytiles;
+	int i, j, x, y, xtiles, ytiles;
 	cgm_vec4 *fbptr;
 	struct tile *tileptr;
 
@@ -32,7 +32,7 @@ int fbsize(int width, int height)
 	}
 	xtiles = (width + opt.tilesz - 1) / opt.tilesz;
 	ytiles = (height + opt.tilesz - 1) / opt.tilesz;
-	if(!(tileptr = malloc(xtiles * ytiles * opt.nsamples * sizeof *tiles))) {
+	if(!(tileptr = malloc(xtiles * ytiles * sizeof *tiles))) {
 		free(fbptr);
 		return -1;
 	}
@@ -44,7 +44,7 @@ int fbsize(int width, int height)
 
 	free(tiles);
 	tiles = tileptr;
-	num_tiles = xtiles * ytiles * opt.nsamples;
+	num_tiles = xtiles * ytiles;
 
 	aspect = (float)fb.width / (float)fb.height;
 
@@ -52,16 +52,14 @@ int fbsize(int width, int height)
 	for(i=0; i<ytiles; i++) {
 		x = 0;
 		for(j=0; j<xtiles; j++) {
-			for(k=0; k<opt.nsamples; k++) {
-				tileptr->x = x;
-				tileptr->y = y;
-				tileptr->width = width - x < opt.tilesz ? width - x : opt.tilesz;
-				tileptr->height = height - y < opt.tilesz ? height - y : opt.tilesz;
-				tileptr->fbptr = fbptr + x;
-				tileptr->sample = k;
-				tileptr++;
+			tileptr->x = x;
+			tileptr->y = y;
+			tileptr->width = width - x < opt.tilesz ? width - x : opt.tilesz;
+			tileptr->height = height - y < opt.tilesz ? height - y : opt.tilesz;
+			tileptr->fbptr = fbptr + x;
+			tileptr->sample = 0;
+			tileptr++;
 
-			}
 			x += opt.tilesz;
 		}
 		fbptr += width * opt.tilesz;
@@ -71,11 +69,12 @@ int fbsize(int width, int height)
 	return 0;
 }
 
-void render(void)
+void render(int samplenum)
 {
 	int i;
 
 	for(i=0; i<num_tiles; i++) {
+		tiles[i].sample = samplenum;
 		tpool_enqueue(tpool, tiles + i, (tpool_callback)render_tile, 0);
 	}
 	tpool_wait(tpool);
@@ -124,23 +123,31 @@ static void bgcolor(cgm_vec3 *color, cgm_ray *ray)
 
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter)
 {
-	cgm_vec3 v;
+	cgm_vec3 v, n;
 	float pdiff, pspec, dp, rval, re;
 	cgm_vec3 rcol;
 	cgm_ray ray;
+
+	if(cgm_vdot(&hit->ray.dir, &hit->v.norm) > 0.0f) {
+		n.x = -hit->v.norm.x;
+		n.y = -hit->v.norm.y;
+		n.z = -hit->v.norm.z;
+	} else {
+		n = hit->v.norm;
+	}
 
 	*color = hit->mtl->emit;
 
 	/* pick diffuse direction */
 	cgm_sphrand(&v, 1.0f);
-	v.x += hit->v.pos.x + hit->v.norm.x;
-	v.y += hit->v.pos.y + hit->v.norm.y;
-	v.z += hit->v.pos.z + hit->v.norm.z;
-	dp = cgm_vdot(&v, &hit->v.norm);
+	v.x += hit->v.pos.x + n.x;
+	v.y += hit->v.pos.y + n.y;
+	v.z += hit->v.pos.z + n.z;
+	dp = cgm_vdot(&v, &n);
 
 	rval = (float)rand() / (float)RAND_MAX;
 
-	if(rval < (re = dp * energy)) {
+	if(rval <= (re = dp * energy)) {
 		ray.origin = hit->v.pos;
 		ray.dir = v;
 		ray_trace(&rcol, &ray, re, max_iter - 1);
