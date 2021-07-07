@@ -124,9 +124,10 @@ static void bgcolor(cgm_vec3 *color, cgm_ray *ray)
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter)
 {
 	cgm_vec3 v, n;
-	float pdiff, pspec, dp, rval, re;
+	float pdiff, pspec, inv_pdiff, inv_pspec, rval, re;
 	cgm_vec3 rcol;
 	cgm_ray ray;
+	cgm_vec3 *mtlcol = &hit->mtl->color;
 
 	if(cgm_vdot(&hit->ray.dir, &hit->v.norm) > 0.0f) {
 		n.x = -hit->v.norm.x;
@@ -138,20 +139,27 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 
 	*color = hit->mtl->emit;
 
-	/* pick diffuse direction */
+	/* pick diffuse direction with a cosine-weighted probability */
 	cgm_sphrand(&v, 1.0f);
-	v.x += hit->v.pos.x + n.x;
-	v.y += hit->v.pos.y + n.y;
-	v.z += hit->v.pos.z + n.z;
-	dp = cgm_vdot(&v, &n);
+	v.x += n.x;
+	v.y += n.y;
+	v.z += n.z;
 
 	rval = (float)rand() / (float)RAND_MAX;
 
-	if(rval <= (re = dp * energy)) {
+	pdiff = (mtlcol->x + mtlcol->y + mtlcol->z) / 3.0f;
+
+	/* TODO: include color in the russian roulette */
+	if(rval <= (re = energy * pdiff)) {
 		ray.origin = hit->v.pos;
 		ray.dir = v;
 		ray_trace(&rcol, &ray, re, max_iter - 1);
-		cgm_vadd(color, &rcol);
+
+		inv_pdiff = 1.0f / pdiff;
+
+		color->x += rcol.x * mtlcol->x * inv_pdiff;
+		color->y += rcol.y * mtlcol->y * inv_pdiff;
+		color->z += rcol.z * mtlcol->z * inv_pdiff;
 	}
 }
 

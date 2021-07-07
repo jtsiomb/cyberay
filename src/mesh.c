@@ -233,6 +233,7 @@ void destroy_scenefile(struct scenefile *scn)
 
 void destroy_mesh(struct mesh *m)
 {
+	free(m->mtl.name);
 	free(m->faces);
 	m->faces = 0;
 }
@@ -392,6 +393,7 @@ static void free_mtllist(struct objmtl *mtl)
 
 static void conv_mtl(struct material *mm, struct objmtl *om)
 {
+	mm->name = strdup(om->name);
 	mm->color = om->kd;
 	mm->emit = om->ke;
 	/* TODO */

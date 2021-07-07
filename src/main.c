@@ -302,6 +302,7 @@ static void keydown(unsigned char key, int x, int y)
 
 static void keyup(unsigned char key, int x, int y)
 {
+	update_modstate();
 	keyb(key, 0);
 }
 
@@ -313,6 +314,7 @@ static void skeydown(int key, int x, int y)
 
 static void skeyup(int key, int x, int y)
 {
+	update_modstate();
 	keyb(key | 0x100, 0);
 }
 
@@ -334,14 +336,14 @@ static void motion(int x, int y)
 
 	if(!(dx | dy)) return;
 
-	if(modstate & MOD_CTRL) {
-		exposure -= dy * 0.01;
-		if(exposure < 1e-4f) exposure = 1e-4f;
-		printf("exposure: %f\n", exposure);
-		return;
-	}
-
 	if(bnstate[0]) {
+		if(modstate & MOD_CTRL) {
+			exposure -= dy * 0.01;
+			if(exposure < 1e-4f) exposure = 1e-4f;
+			printf("exposure: %f\n", exposure);
+			return;
+		}
+
 		cam_theta -= dx * 0.01;
 		cam_phi -= dy * 0.01;
 
