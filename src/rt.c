@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <float.h>
+#include <assert.h>
 #include "rt.h"
 #include "game.h"
 
@@ -139,20 +140,27 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 
 	*color = hit->mtl->emit;
 
-	/* pick diffuse direction with a cosine-weighted probability */
-	cgm_sphrand(&v, 1.0f);
-	v.x += n.x;
-	v.y += n.y;
-	v.z += n.z;
+	pdiff = (mtlcol->x + mtlcol->y + mtlcol->z) / 3.0f;
 
 	rval = (float)rand() / (float)RAND_MAX;
 
-	pdiff = (mtlcol->x + mtlcol->y + mtlcol->z) / 3.0f;
-
-	/* TODO: include color in the russian roulette */
 	if(rval <= (re = energy * pdiff)) {
+		cgm_vnormalize(&n);
+
+		/* pick diffuse direction with a cosine-weighted probability */
+		cgm_sphrand(&ray.dir, 0.98f);
+		ray.dir.x += n.x;
+		ray.dir.y += n.y;
+		ray.dir.z += n.z;
+		cgm_vnormalize(&ray.dir);
+
+		if(cgm_vdot(&ray.dir, &n) < 0.0f) {
+			ray.dir.x = -ray.dir.x;
+			ray.dir.y = -ray.dir.y;
+			ray.dir.z = -ray.dir.z;
+		}
+
 		ray.origin = hit->v.pos;
-		ray.dir = v;
 		ray_trace(&rcol, &ray, re, max_iter - 1);
 
 		inv_pdiff = 1.0f / pdiff;

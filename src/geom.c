@@ -34,6 +34,7 @@ int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *
 		hit->v.norm.x = tri->v[0].norm.x * bc.x + tri->v[1].norm.x * bc.y + tri->v[2].norm.x * bc.z;
 		hit->v.norm.y = tri->v[0].norm.y * bc.x + tri->v[1].norm.y * bc.y + tri->v[2].norm.y * bc.z;
 		hit->v.norm.z = tri->v[0].norm.z * bc.x + tri->v[1].norm.z * bc.y + tri->v[2].norm.z * bc.z;
+		/* cgm_vnormalize(&hit->v.norm); */
 
 		hit->v.tex.x = tri->v[0].tex.x * bc.x + tri->v[1].tex.x * bc.y + tri->v[2].tex.x * bc.z;
 		hit->v.tex.y = tri->v[0].tex.y * bc.x + tri->v[1].tex.y * bc.y + tri->v[2].tex.y * bc.z;
