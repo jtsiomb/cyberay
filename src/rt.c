@@ -118,7 +118,7 @@ static void ray_trace(cgm_vec3 *color, cgm_ray *ray, float energy, int max_iter)
 
 static void bgcolor(cgm_vec3 *color, cgm_ray *ray)
 {
-	color->x = color->y = color->z = 1.0f;
+	color->x = color->y = color->z = 100.0f;
 }
 
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter)

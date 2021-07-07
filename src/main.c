@@ -11,6 +11,12 @@
 #include "statui.h"
 
 enum {
+	MOD_SHIFT	= 1,
+	MOD_CTRL	= 2,
+	MOD_ALT		= 4
+};
+
+enum {
 	KEY_F1		= GLUT_KEY_F1 | 0x100,
 	KEY_F2		= GLUT_KEY_F2 | 0x100,
 	KEY_F3		= GLUT_KEY_F3 | 0x100,
@@ -48,6 +54,7 @@ static void skeydown(int key, int x, int y);
 static void skeyup(int key, int x, int y);
 static void mouse(int bn, int st, int x, int y);
 static void motion(int x, int y);
+static void update_modstate(void);
 
 static int cur_sample;
 
@@ -66,6 +73,8 @@ static int keymap[NUM_INPUTS][2] = {
 	{'a', KEY_LEFT},
 	{' ', 0}
 };
+
+static unsigned int modstate;
 
 static int auto_res;
 
@@ -280,13 +289,14 @@ static void keyb(int key, int press)
 			show_statui(showstat);
 			break;
 		}
-
 	}
 }
 
 static void keydown(unsigned char key, int x, int y)
 {
 	if(key == 27) exit(0);
+
+	update_modstate();
 	keyb(key, 1);
 }
 
@@ -297,6 +307,7 @@ static void keyup(unsigned char key, int x, int y)
 
 static void skeydown(int key, int x, int y)
 {
+	update_modstate();
 	keyb(key | 0x100, 1);
 }
 
@@ -307,6 +318,8 @@ static void skeyup(int key, int x, int y)
 
 static void mouse(int bn, int st, int x, int y)
 {
+	update_modstate();
+
 	mouse_x = x;
 	mouse_y = y;
 	bnstate[bn - GLUT_LEFT_BUTTON] = st == GLUT_DOWN ? 1 : 0;
@@ -321,6 +334,13 @@ static void motion(int x, int y)
 
 	if(!(dx | dy)) return;
 
+	if(modstate & MOD_CTRL) {
+		exposure -= dy * 0.01;
+		if(exposure < 1e-4f) exposure = 1e-4f;
+		printf("exposure: %f\n", exposure);
+		return;
+	}
+
 	if(bnstate[0]) {
 		cam_theta -= dx * 0.01;
 		cam_phi -= dy * 0.01;
@@ -332,3 +352,7 @@ static void motion(int x, int y)
 	}
 }
 
+static void update_modstate(void)
+{
+	modstate = glutGetModifiers();
+}

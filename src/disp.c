@@ -12,7 +12,7 @@ static int tex_intfmt;
 static float tex_xform[16];
 
 static unsigned int sdr;
-static int uloc_inv_gamma;
+static int uloc_inv_gamma, uloc_exposure;
 
 static unsigned int nextpow2(unsigned int x);
 
@@ -32,12 +32,16 @@ int init_display(void)
 		return -1;
 	}
 
+	glUseProgram(sdr);
 	if((uloc_inv_gamma = glGetUniformLocation(sdr, "inv_gamma")) != -1) {
 		inv_gamma = 1.0f / opt.gamma;
-		glUseProgram(sdr);
 		glUniform3f(uloc_inv_gamma, inv_gamma, inv_gamma, inv_gamma);
-		glUseProgram(0);
 	}
+	if((uloc_exposure = glGetUniformLocation(sdr, "exposure")) != -1) {
+		exposure = 1.0f;
+		glUniform1f(uloc_exposure, 1.0f);
+	}
+	glUseProgram(0);
 
 	return 0;
 }
@@ -66,11 +70,18 @@ void resize_display(int x, int y)
 
 void display(void)
 {
+	static float prev_exp = 1.0f;
+
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fb.width, fb.height, GL_RGBA, GL_FLOAT, fb.pixels);
 	glEnable(GL_TEXTURE_2D);
 
 	bind_program(sdr);
+
+	if(exposure != prev_exp) {
+		glUniform1f(uloc_exposure, exposure);
+		prev_exp = exposure;
+	}
 
 	glBegin(GL_QUADS);
 	glColor3f(1, 1, 1);

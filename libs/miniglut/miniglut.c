@@ -581,7 +581,8 @@ static void handle_event(XEvent *ev)
 
 	case KeyPress:
 	case KeyRelease:
-		modstate = ev->xkey.state & (ShiftMask | ControlMask | Mod1Mask);
+		modstate = ((ev->xkey.state & (ControlMask | Mod1Mask)) >> 1) |
+			(ev->xkey.state & ShiftMask);
 		if(!(sym = XLookupKeysym(&ev->xkey, 0))) {
 			break;
 		}
@@ -603,7 +604,8 @@ static void handle_event(XEvent *ev)
 
 	case ButtonPress:
 	case ButtonRelease:
-		modstate = ev->xbutton.state & (ShiftMask | ControlMask | Mod1Mask);
+		modstate = ((ev->xkey.state & (ControlMask | Mod1Mask)) >> 1) |
+			(ev->xkey.state & ShiftMask);
 		if(cb_mouse) {
 			int bn = ev->xbutton.button - Button1;
 			cb_mouse(bn, ev->type == ButtonPress ? GLUT_DOWN : GLUT_UP,

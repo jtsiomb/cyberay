@@ -1,6 +1,8 @@
 #ifndef DISP_H_
 #define DISP_H_
 
+float exposure;
+
 int init_display(void);
 void cleanup_display(void);
 
