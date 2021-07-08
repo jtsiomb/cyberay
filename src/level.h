@@ -5,6 +5,8 @@
 #include "bvh.h"
 
 struct level {
+	cgm_vec3 bgcolor;
+
 	struct bvhnode *st_root;
 	struct bvhnode *dyn_root;
 

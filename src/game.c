@@ -16,6 +16,7 @@ static struct optcfg_option options[] = {
 };
 
 static int opt_handler(struct optcfg *o, int opt, void *cls);
+static int arg_handler(struct optcfg *o, const char *arg, void *cls);
 
 int init_options(int argc, char **argv)
 {
@@ -32,6 +33,7 @@ int init_options(int argc, char **argv)
 
 	optcfg = optcfg_init(options);
 	optcfg_set_opt_callback(optcfg, opt_handler, argv[0]);
+	optcfg_set_arg_callback(optcfg, arg_handler, argv[0]);
 	optcfg_parse_config_file(optcfg, "cyberay.conf");
 	if(optcfg_parse_args(optcfg, argc, argv) == -1) {
 		return -1;
@@ -107,5 +109,15 @@ static int opt_handler(struct optcfg *o, int optid, void *cls)
 		optcfg_print_options(o);
 		exit(0);
 	}
+	return 0;
+}
+
+static int arg_handler(struct optcfg *o, const char *arg, void *cls)
+{
+	if(opt.lvlfile) {
+		fprintf(stderr, "unexpected argument: %s\n", arg);
+		return -1;
+	}
+	opt.lvlfile = arg;
 	return 0;
 }

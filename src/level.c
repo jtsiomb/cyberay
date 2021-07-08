@@ -18,6 +18,7 @@ int load_level(struct level *lvl, const char *fname)
 	struct scenefile scn;
 	struct mesh *mesh, *tail;
 	unsigned long start_time;
+	float *vec;
 
 	memset(lvl, 0, sizeof *lvl);
 	if(!(lvl->st_root = calloc(1, sizeof *lvl->st_root)) ||
@@ -49,6 +50,14 @@ int load_level(struct level *lvl, const char *fname)
 		return -1;
 	}
 
+	/* lookup environment properties */
+	if((vec = ts_lookup_vec(root, "level.env.color", 0))) {
+		lvl->bgcolor.x = vec[0];
+		lvl->bgcolor.y = vec[1];
+		lvl->bgcolor.z = vec[2];
+	}
+
+	/* load scene files */
 	node = root->child_list;
 	while(node) {
 		if(strcmp(node->name, "scene") == 0) {
@@ -311,6 +320,8 @@ static int edit_mtl(struct ts_node *node, const char *mtlname, const char *mtlpr
 		mtlop_vec(op, &mtl->roughness, opval, 1);
 	} else if(strcmp(mtlprop, "ior") == 0) {
 		mtlop_vec(op, &mtl->ior, opval, 1);
+	} else if(strcmp(mtlprop, "transmit") == 0) {
+		mtlop_vec(op, &mtl->transmit, opval, 1);
 	} else if(strcmp(mtlprop, "texture") == 0) {
 		if(op != OP_SET) {
 			fprintf(stderr, "mtl edit: invalid operation for textures\n");

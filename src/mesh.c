@@ -359,17 +359,15 @@ static struct objmtl *load_mtllib(const char *objfname, const char *mtlfname)
 				}
 			}
 		} else if(memcmp(line, "Kd", 2) == 0) {
-			if(m) {
-				sscanf(line + 3, "%f %f %f", &m->kd.x, &m->kd.y, &m->kd.z);
-			}
+			if(m) sscanf(line + 3, "%f %f %f", &m->kd.x, &m->kd.y, &m->kd.z);
 		} else if(memcmp(line, "Ks", 2) == 0) {
-			if(m) {
-				sscanf(line + 3, "%f %f %f", &m->ks.x, &m->ks.y, &m->ks.z);
-			}
+			if(m) sscanf(line + 3, "%f %f %f", &m->ks.x, &m->ks.y, &m->ks.z);
 		} else if(memcmp(line, "Ke", 2) == 0) {
-			if(m) {
-				sscanf(line + 3, "%f %f %f", &m->ke.x, &m->ke.y, &m->ke.z);
-			}
+			if(m) sscanf(line + 3, "%f %f %f", &m->ke.x, &m->ke.y, &m->ke.z);
+		} else if(memcmp(line, "Ni", 2) == 0) {
+			if(m) m->ior = atof(line + 3);
+		} else if(line[0] == 'd' && isspace(line[1])) {
+			if(m) m->alpha = atof(line + 2);
 		}
 	}
 
@@ -395,6 +393,8 @@ static void conv_mtl(struct material *mm, struct objmtl *om)
 {
 	mm->name = strdup(om->name);
 	mm->color = om->kd;
+	mm->specular = om->ks;
 	mm->emit = om->ke;
-	/* TODO */
+	mm->roughness = 1.0f;
+	mm->transmit = 1.0f - om->alpha;
 }

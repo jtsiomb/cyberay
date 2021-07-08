@@ -12,6 +12,8 @@ struct options {
 	int max_iter;
 	int nsamples;
 	float gamma;
+
+	char *lvlfile;
 };
 
 int win_width, win_height;

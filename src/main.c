@@ -147,7 +147,7 @@ static int init(void)
 		return -1;
 	}
 
-	if(load_level(&lvl, "data/test.lvl") == -1) {
+	if(load_level(&lvl, opt.lvlfile ? opt.lvlfile : "data/test.lvl") == -1) {
 		return -1;
 	}
 

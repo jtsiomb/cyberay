@@ -119,39 +119,41 @@ static void ray_trace(cgm_vec3 *color, cgm_ray *ray, float energy, int max_iter)
 
 static void bgcolor(cgm_vec3 *color, cgm_ray *ray)
 {
-	color->x = color->y = color->z = 100.0f;
+	*color = lvl.bgcolor;
 }
 
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter)
 {
 	cgm_vec3 v, n;
-	float pdiff, pspec, inv_pdiff, inv_pspec, rval, re;
+	float diffuse, specular, inv_diff, inv_spec;
+	float pdiff, pspec, rval;
 	cgm_vec3 rcol;
 	cgm_ray ray;
-	cgm_vec3 *mtlcol = &hit->mtl->color;
+	struct material *mtl = hit->mtl;
 
 	if(cgm_vdot(&hit->ray.dir, &hit->v.norm) > 0.0f) {
-		n.x = -hit->v.norm.x;
-		n.y = -hit->v.norm.y;
-		n.z = -hit->v.norm.z;
+		cgm_vcons(&n, -hit->v.norm.x, -hit->v.norm.y, -hit->v.norm.z);
 	} else {
 		n = hit->v.norm;
 	}
 
 	*color = hit->mtl->emit;
 
-	pdiff = (mtlcol->x + mtlcol->y + mtlcol->z) / 3.0f;
+	diffuse = (mtl->color.x + mtl->color.y + mtl->color.z) / 3.0f;
+	specular = (mtl->specular.x + mtl->specular.y + mtl->specular.z) / 3.0f;
 
 	rval = (float)rand() / (float)RAND_MAX;
 
-	if(rval <= (re = energy * pdiff)) {
+	pdiff = energy * diffuse * mtl->roughness;
+	pspec = energy * specular * (1.0f - mtl->roughness);
+	assert(pdiff + pspec <= 1.0f);
+
+	if(rval <= pdiff) {
 		cgm_vnormalize(&n);
 
 		/* pick diffuse direction with a cosine-weighted probability */
 		cgm_sphrand(&ray.dir, 0.98f);
-		ray.dir.x += n.x;
-		ray.dir.y += n.y;
-		ray.dir.z += n.z;
+		cgm_vadd(&ray.dir, &n);
 		cgm_vnormalize(&ray.dir);
 
 		if(cgm_vdot(&ray.dir, &n) < 0.0f) {
@@ -161,13 +163,39 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		}
 
 		ray.origin = hit->v.pos;
-		ray_trace(&rcol, &ray, re, max_iter - 1);
+		ray_trace(&rcol, &ray, pdiff, max_iter - 1);
 
-		inv_pdiff = 1.0f / pdiff;
+		inv_diff = 1.0f / pdiff;
 
-		color->x += rcol.x * mtlcol->x * inv_pdiff;
-		color->y += rcol.y * mtlcol->y * inv_pdiff;
-		color->z += rcol.z * mtlcol->z * inv_pdiff;
+		color->x += rcol.x * mtl->color.x * inv_diff;
+		color->y += rcol.y * mtl->color.y * inv_diff;
+		color->z += rcol.z * mtl->color.z * inv_diff;
+
+	} else if(rval <= pdiff + pspec) {
+		cgm_vnormalize(&n);
+
+		/* calculate reflection direction */
+		ray.dir = hit->ray.dir;
+		cgm_vreflect(&ray.dir, &n);
+
+		/* pick specular direction */
+		if(mtl->roughness > 0.0f) {
+			cgm_sphrand(&v, mtl->roughness);
+			cgm_vadd(&ray.dir, &v);
+		}
+		cgm_vnormalize(&ray.dir);
+
+		if(cgm_vdot(&ray.dir, &n) > 0.0f) {
+			/* only sample rays not crashing back into the surface */
+			ray.origin = hit->v.pos;
+			ray_trace(&rcol, &ray, pspec, max_iter - 1);
+
+			inv_spec = 1.0f / pspec;
+
+			color->x += rcol.x * mtl->specular.x * inv_spec;
+			color->y += rcol.y * mtl->specular.y * inv_spec;
+			color->z += rcol.z * mtl->specular.z * inv_spec;
+		}
 	}
 }
 
