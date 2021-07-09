@@ -397,4 +397,5 @@ static void conv_mtl(struct material *mm, struct objmtl *om)
 	mm->emit = om->ke;
 	mm->roughness = 1.0f;
 	mm->transmit = 1.0f - om->alpha;
+	mm->metal = 0;
 }

@@ -148,18 +148,21 @@ static inline void cgm_vreflect(cgm_vec3 *v, const cgm_vec3 *n)
 	v->z -= n->z * ndotv2;
 }
 
-static inline void cgm_vrefract(cgm_vec3 *v, const cgm_vec3 *n, float ior)
+static inline int cgm_vrefract(cgm_vec3 *v, const cgm_vec3 *n, float ior)
 {
+	float sqrt_k;
 	float ndotv = cgm_vdot(v, n);
 	float k = 1.0f - ior * ior * (1.0f - ndotv * ndotv);
+
 	if(k < 0.0f) {
 		cgm_vreflect(v, n);	/* TIR */
-	} else {
-		float sqrt_k = sqrt(k);
-		v->x = ior * v->x - (ior * ndotv + sqrt_k) * n->x;
-		v->y = ior * v->y - (ior * ndotv + sqrt_k) * n->y;
-		v->z = ior * v->z - (ior * ndotv + sqrt_k) * n->z;
+		return -1;
 	}
+	sqrt_k = sqrt(k);
+	v->x = ior * v->x - (ior * ndotv + sqrt_k) * n->x;
+	v->y = ior * v->y - (ior * ndotv + sqrt_k) * n->y;
+	v->z = ior * v->z - (ior * ndotv + sqrt_k) * n->z;
+	return 0;
 }
 
 static inline void cgm_vrotate_quat(cgm_vec3 *v, const cgm_quat *q)

@@ -11,6 +11,7 @@ struct material {
 	float transmit;
 	float roughness;
 	float ior;
+	int metal;
 
 	struct image *tex_color;
 };

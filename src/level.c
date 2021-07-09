@@ -322,6 +322,12 @@ static int edit_mtl(struct ts_node *node, const char *mtlname, const char *mtlpr
 		mtlop_vec(op, &mtl->ior, opval, 1);
 	} else if(strcmp(mtlprop, "transmit") == 0) {
 		mtlop_vec(op, &mtl->transmit, opval, 1);
+	} else if(strcmp(mtlprop, "metal") == 0) {
+		if(op != OP_SET || opattr->val.type != TS_NUMBER) {
+			fprintf(stderr, "mtl edit: invalid operation or attribute type for metal\n");
+			return -1;
+		}
+		mtl->metal = opattr->val.inum != 0;
 	} else if(strcmp(mtlprop, "texture") == 0) {
 		if(op != OP_SET) {
 			fprintf(stderr, "mtl edit: invalid operation for textures\n");

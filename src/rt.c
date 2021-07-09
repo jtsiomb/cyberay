@@ -21,6 +21,7 @@ static void ray_trace(cgm_vec3 *color, cgm_ray *ray, float energy, int max_iter)
 static void bgcolor(cgm_vec3 *color, cgm_ray *ray);
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter);
 static void primary_ray(cgm_ray *ray, int x, int y, int sample);
+static float fresnel(float costheta, float ior);
 
 int fbsize(int width, int height)
 {
@@ -124,9 +125,11 @@ static void bgcolor(cgm_vec3 *color, cgm_ray *ray)
 
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter)
 {
-	cgm_vec3 v, n;
+	int transmit;
+	cgm_vec3 v, n, out_n;
 	float diffuse, specular, inv_diff, inv_spec;
 	float pdiff, pspec, rval;
+	float fres;
 	cgm_vec3 rcol;
 	cgm_ray ray;
 	struct material *mtl = hit->mtl;
@@ -173,10 +176,24 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 
 	} else if(rval <= pdiff + pspec) {
 		cgm_vnormalize(&n);
-
-		/* calculate reflection direction */
 		ray.dir = hit->ray.dir;
-		cgm_vreflect(&ray.dir, &n);
+
+		if(!mtl->metal && (transmit = mtl->transmit > 0.0f)) {
+			/* calculate fresnel factor */
+			fres = fresnel(-cgm_vdot(&hit->ray.dir, &n), mtl->ior);
+			if((float)rand() / RAND_MAX < fres) {
+				goto reflect;
+			}
+
+			/* calculate refraction direction */
+			if(cgm_vrefract(&ray.dir, &n, mtl->ior) == -1) {
+				transmit = 0;
+			}
+		} else {
+reflect:	transmit = 0;
+			/* calculate reflection direction */
+			cgm_vreflect(&ray.dir, &n);
+		}
 
 		/* pick specular direction */
 		if(mtl->roughness > 0.0f) {
@@ -185,7 +202,12 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		}
 		cgm_vnormalize(&ray.dir);
 
-		if(cgm_vdot(&ray.dir, &n) > 0.0f) {
+		if(transmit) {
+			cgm_vcons(&out_n, -n.x, -n.y, -n.z);
+		} else {
+			out_n = n;
+		}
+		if(cgm_vdot(&ray.dir, &out_n) > 0.0f) {
 			/* only sample rays not crashing back into the surface */
 			ray.origin = hit->v.pos;
 			ray_trace(&rcol, &ray, pspec, max_iter - 1);
@@ -210,4 +232,17 @@ static void primary_ray(cgm_ray *ray, int x, int y, int sample)
 	/* TODO jitter */
 
 	cgm_rmul_mr(ray, view_xform);
+}
+
+static float fresnel(float costheta, float ior)
+{
+	float x, xsq, r0;
+
+	r0 = (1.0f - ior) / (1.0f + ior);
+	r0 *= r0;
+
+	x = 1.0f - costheta;
+	xsq = x * x;
+
+	return r0 + (1.0f - r0) * (xsq * xsq * x);
 }

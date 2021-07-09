@@ -84,7 +84,7 @@ static inline float cgm_vdist_sq(const cgm_vec3 *a, const cgm_vec3 *b);
 static inline void cgm_vnormalize(cgm_vec3 *v);
 
 static inline void cgm_vreflect(cgm_vec3 *v, const cgm_vec3 *n);
-static inline void cgm_vrefract(cgm_vec3 *v, const cgm_vec3 *n, float ior);
+static inline int cgm_vrefract(cgm_vec3 *v, const cgm_vec3 *n, float ior);
 
 static inline void cgm_vrotate_quat(cgm_vec3 *v, const cgm_quat *q);
 static inline void cgm_vrotate_axis(cgm_vec3 *v, int axis, float angle);
