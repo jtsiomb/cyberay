@@ -127,7 +127,7 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 {
 	int transmit;
 	cgm_vec3 v, n, out_n;
-	float diffuse, specular, inv_diff, inv_spec;
+	float diffuse, specular, inv_color;
 	float pdiff, pspec, rval;
 	float fres;
 	cgm_vec3 rcol;
@@ -143,7 +143,13 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 	*color = hit->mtl->emit;
 
 	diffuse = (mtl->color.x + mtl->color.y + mtl->color.z) / 3.0f;
-	specular = (mtl->specular.x + mtl->specular.y + mtl->specular.z) / 3.0f;
+	inv_color = 1.0f / diffuse;
+
+	if(mtl->metal) {
+		specular = diffuse;
+	} else {
+		specular = 1.0f;
+	}
 
 	rval = (float)rand() / (float)RAND_MAX;
 
@@ -168,11 +174,9 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		ray.origin = hit->v.pos;
 		ray_trace(&rcol, &ray, pdiff, max_iter - 1);
 
-		inv_diff = 1.0f / pdiff;
-
-		color->x += rcol.x * mtl->color.x * inv_diff;
-		color->y += rcol.y * mtl->color.y * inv_diff;
-		color->z += rcol.z * mtl->color.z * inv_diff;
+		color->x += rcol.x * mtl->color.x * inv_color;
+		color->y += rcol.y * mtl->color.y * inv_color;
+		color->z += rcol.z * mtl->color.z * inv_color;
 
 	} else if(rval <= pdiff + pspec) {
 		cgm_vnormalize(&n);
@@ -212,11 +216,13 @@ reflect:	transmit = 0;
 			ray.origin = hit->v.pos;
 			ray_trace(&rcol, &ray, pspec, max_iter - 1);
 
-			inv_spec = 1.0f / pspec;
-
-			color->x += rcol.x * mtl->specular.x * inv_spec;
-			color->y += rcol.y * mtl->specular.y * inv_spec;
-			color->z += rcol.z * mtl->specular.z * inv_spec;
+			if(mtl->metal) {
+				color->x += rcol.x * mtl->color.x * inv_color;
+				color->y += rcol.y * mtl->color.y * inv_color;
+				color->z += rcol.z * mtl->color.z * inv_color;
+			} else {
+				cgm_vadd(color, &rcol);
+			}
 		}
 	}
 }

@@ -7,7 +7,7 @@
 
 struct material {
 	char *name;
-	cgm_vec3 color, specular, emit;
+	cgm_vec3 color, emit;
 	float transmit;
 	float roughness;
 	float ior;
