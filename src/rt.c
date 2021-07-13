@@ -3,11 +3,14 @@
 #include <assert.h>
 #include "rt.h"
 #include "game.h"
+#include "tinymt32.h"
 
 struct tile {
 	int x, y, width, height;
 	int sample;
 	cgm_vec4 *fbptr;
+
+	tinymt32_t rndstate;
 };
 
 float vfov = M_PI / 4;
@@ -22,6 +25,8 @@ static void bgcolor(cgm_vec3 *color, cgm_ray *ray);
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter);
 static void primary_ray(cgm_ray *ray, int x, int y, int sample);
 static float fresnel(float costheta, float ior);
+
+static __thread struct tile *curtile;
 
 int fbsize(int width, int height)
 {
@@ -60,6 +65,7 @@ int fbsize(int width, int height)
 			tileptr->height = height - y < opt.tilesz ? height - y : opt.tilesz;
 			tileptr->fbptr = fbptr + x;
 			tileptr->sample = 0;
+			tinymt32_init(&tileptr->rndstate, (i << 16) | j);
 			tileptr++;
 
 			x += opt.tilesz;
@@ -88,6 +94,8 @@ static void render_tile(struct tile *tile)
 	cgm_ray ray;
 	cgm_vec3 col;
 	cgm_vec4 *fbptr = tile->fbptr;
+
+	curtile = tile;
 
 	for(i=0; i<tile->height; i++) {
 		for(j=0; j<tile->width; j++) {
@@ -123,6 +131,26 @@ static void bgcolor(cgm_vec3 *color, cgm_ray *ray)
 	*color = lvl.bgcolor;
 }
 
+static inline float frand(void)
+{
+	return tinymt32_generate_float(&curtile->rndstate);
+}
+
+static inline void sphrand(cgm_vec3 *pt, float rad)
+{
+	float u, v, theta, phi;
+
+	u = frand();
+	v = frand();
+
+	theta = 2.0f * M_PI * u;
+	phi = acos(2.0f * v - 1.0f);
+
+	pt->x = cos(theta) * sin(phi) * rad;
+	pt->y = sin(theta) * sin(phi) * rad;
+	pt->z = cos(phi) * rad;
+}
+
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter)
 {
 	int transmit;
@@ -151,7 +179,7 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		specular = 1.0f;
 	}
 
-	rval = (float)rand() / (float)RAND_MAX;
+	rval = frand();
 
 	pdiff = energy * diffuse * mtl->roughness;
 	pspec = energy * specular * (1.0f - mtl->roughness);
@@ -161,7 +189,7 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		cgm_vnormalize(&n);
 
 		/* pick diffuse direction with a cosine-weighted probability */
-		cgm_sphrand(&ray.dir, 0.98f);
+		sphrand(&ray.dir, 0.98f);
 		cgm_vadd(&ray.dir, &n);
 		cgm_vnormalize(&ray.dir);
 
@@ -185,7 +213,7 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		if(!mtl->metal && (transmit = mtl->transmit > 0.0f)) {
 			/* calculate fresnel factor */
 			fres = fresnel(-cgm_vdot(&hit->ray.dir, &n), mtl->ior);
-			if((float)rand() / RAND_MAX < fres) {
+			if(frand() < fres) {
 				goto reflect;
 			}
 
@@ -201,7 +229,7 @@ reflect:	transmit = 0;
 
 		/* pick specular direction */
 		if(mtl->roughness > 0.0f) {
-			cgm_sphrand(&v, mtl->roughness);
+			sphrand(&v, mtl->roughness);
 			cgm_vadd(&ray.dir, &v);
 		}
 		cgm_vnormalize(&ray.dir);
