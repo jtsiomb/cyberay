@@ -254,13 +254,14 @@ reflect:	transmit = 0;
 
 static void primary_ray(cgm_ray *ray, int x, int y, int sample)
 {
+	float fx = x + frand() - 0.5f;
+	float fy = y + frand() - 0.5f;
+
 	ray->origin.x = ray->origin.y = ray->origin.z = 0.0f;
-	ray->dir.x = (2.0f * (float)x / (float)fb.width - 1.0f) * aspect;
-	ray->dir.y = 1.0f - 2.0f * (float)y / (float)fb.height;
+	ray->dir.x = (2.0f * fx / (float)fb.width - 1.0f) * aspect;
+	ray->dir.y = 1.0f - 2.0f * fy / (float)fb.height;
 	ray->dir.z = -1.0f / tan(vfov / 2.0f);
 	cgm_vnormalize(&ray->dir);
-
-	/* TODO jitter */
 
 	cgm_rmul_mr(ray, view_xform);
 }
