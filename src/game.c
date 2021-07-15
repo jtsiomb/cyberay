@@ -118,6 +118,6 @@ static int arg_handler(struct optcfg *o, const char *arg, void *cls)
 		fprintf(stderr, "unexpected argument: %s\n", arg);
 		return -1;
 	}
-	opt.lvlfile = arg;
+	opt.lvlfile = (char*)arg;
 	return 0;
 }

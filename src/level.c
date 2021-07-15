@@ -162,9 +162,9 @@ static void draw_level_rec(struct bvhnode *bn)
 			tri = bn->faces[i];
 			if(tri->mtl != curmtl) {
 				glEnd();
-				color[0] = tri->mtl->color.x;
-				color[1] = tri->mtl->color.y;
-				color[2] = tri->mtl->color.z;
+				color[0] = tri->mtl->attr[MATTR_COLOR].value.x;
+				color[1] = tri->mtl->attr[MATTR_COLOR].value.y;
+				color[2] = tri->mtl->attr[MATTR_COLOR].value.z;
 				glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, color);
 				curmtl = tri->mtl;
 				glBegin(GL_TRIANGLES);
@@ -313,15 +313,15 @@ static int edit_mtl(struct ts_node *node, const char *mtlname, const char *mtlpr
 	}
 
 	if(strcmp(mtlprop, "color") == 0) {
-		mtlop_vec(op, &mtl->color.x, opval, 3);
+		mtlop_vec(op, &mtl->attr[MATTR_COLOR].value.x, opval, 3);
 	} else if(strcmp(mtlprop, "emit") == 0) {
-		mtlop_vec(op, &mtl->emit.x, opval, 3);
+		mtlop_vec(op, &mtl->attr[MATTR_EMIT].value.x, opval, 3);
 	} else if(strcmp(mtlprop, "roughness") == 0) {
-		mtlop_vec(op, &mtl->roughness, opval, 1);
+		mtlop_vec(op, &mtl->attr[MATTR_ROUGHNESS].value.x, opval, 1);
 	} else if(strcmp(mtlprop, "ior") == 0) {
 		mtlop_vec(op, &mtl->ior, opval, 1);
 	} else if(strcmp(mtlprop, "transmit") == 0) {
-		mtlop_vec(op, &mtl->transmit, opval, 1);
+		mtlop_vec(op, &mtl->attr[MATTR_TRANSMIT].value.x, opval, 1);
 	} else if(strcmp(mtlprop, "metal") == 0) {
 		if(op != OP_SET || opattr->val.type != TS_NUMBER) {
 			fprintf(stderr, "mtl edit: invalid operation or attribute type for metal\n");

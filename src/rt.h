@@ -5,15 +5,26 @@
 #include "image.h"
 #include "tpool.h"
 
+struct mtlattr {
+	cgm_vec3 value;
+	struct image *tex;
+};
+
+enum {
+	MATTR_COLOR,
+	MATTR_EMIT,
+	MATTR_TRANSMIT,
+	MATTR_ROUGHNESS,
+
+	NUM_MATTR
+};
+
 struct material {
 	char *name;
-	cgm_vec3 color, emit;
-	float transmit;
-	float roughness;
+	struct mtlattr attr[NUM_MATTR];
 	float ior;
 	int metal;
-
-	struct image *tex_color;
+	struct image *mask;
 };
 
 struct framebuffer {
@@ -28,5 +39,7 @@ float view_xform[16];
 int fbsize(int width, int height);
 
 void render(int samplenum);
+
+void tex_lookup(cgm_vec3 *res, struct image *img, float u, float v);
 
 #endif	/* RT_H_ */

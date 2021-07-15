@@ -1,10 +1,11 @@
 #include <float.h>
 #include "geom.h"
+#include "rt.h"
 
 int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *hit)
 {
-	float t, ndotdir;
-	cgm_vec3 vdir, bc, pos;
+	float t, ndotdir, u, v;
+	cgm_vec3 vdir, bc, pos, mask_texel;
 
 	if(fabs(ndotdir = cgm_vdot(&ray->dir, &tri->norm)) <= 1e-6) {
 		return 0;
@@ -25,6 +26,16 @@ int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *
 	if(bc.z < 0.0f || bc.z > 1.0f) return 0;
 
 	if(hit) {
+		u = tri->v[0].tex.x * bc.x + tri->v[1].tex.x * bc.y + tri->v[2].tex.x * bc.z;
+		v = tri->v[0].tex.y * bc.x + tri->v[1].tex.y * bc.y + tri->v[2].tex.y * bc.z;
+
+		if(tri->mtl->mask) {
+			tex_lookup(&mask_texel, tri->mtl->mask, u, v);
+			if(mask_texel.x < 0.5f) {
+				return 0;
+			}
+		}
+
 		hit->t = t;
 		hit->ray = *ray;
 		hit->mtl = tri->mtl;
@@ -36,8 +47,8 @@ int ray_triangle(cgm_ray *ray, struct triangle *tri, float tmax, struct rayhit *
 		hit->v.norm.z = tri->v[0].norm.z * bc.x + tri->v[1].norm.z * bc.y + tri->v[2].norm.z * bc.z;
 		/* cgm_vnormalize(&hit->v.norm); */
 
-		hit->v.tex.x = tri->v[0].tex.x * bc.x + tri->v[1].tex.x * bc.y + tri->v[2].tex.x * bc.z;
-		hit->v.tex.y = tri->v[0].tex.y * bc.x + tri->v[1].tex.y * bc.y + tri->v[2].tex.y * bc.z;
+		hit->v.tex.x = u;
+		hit->v.tex.y = v;
 	}
 	return 1;
 }

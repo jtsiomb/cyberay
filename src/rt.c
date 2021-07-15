@@ -25,6 +25,8 @@ static void bgcolor(cgm_vec3 *color, cgm_ray *ray);
 static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_iter);
 static void primary_ray(cgm_ray *ray, int x, int y, int sample);
 static float fresnel(float costheta, float ior);
+static float mtlattr_num(struct material *mtl, int attr, cgm_vec2 *uv);
+static void mtlattr_vec(cgm_vec3 *res, struct material *mtl, int attr, cgm_vec2 *uv);
 
 static __thread struct tile *curtile;
 
@@ -155,10 +157,10 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 {
 	int transmit;
 	cgm_vec3 v, n, out_n;
-	float diffuse, specular, inv_color;
+	float mrough, mtrans;
 	float pdiff, pspec, rval;
 	float fres;
-	cgm_vec3 rcol;
+	cgm_vec3 mcol, rcol;
 	cgm_ray ray;
 	struct material *mtl = hit->mtl;
 
@@ -168,21 +170,16 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		n = hit->v.norm;
 	}
 
-	*color = hit->mtl->emit;
+	mtlattr_vec(&mcol, hit->mtl, MATTR_COLOR, &hit->v.tex);
+	mrough = mtlattr_num(hit->mtl, MATTR_ROUGHNESS, &hit->v.tex);
+	mtrans = mtlattr_num(hit->mtl, MATTR_TRANSMIT, &hit->v.tex);
 
-	diffuse = (mtl->color.x + mtl->color.y + mtl->color.z) / 3.0f;
-	inv_color = 1.0f / diffuse;
-
-	if(mtl->metal) {
-		specular = diffuse;
-	} else {
-		specular = 1.0f;
-	}
+	mtlattr_vec(color, hit->mtl, MATTR_EMIT, &hit->v.tex);
 
 	rval = frand();
 
-	pdiff = energy * diffuse * mtl->roughness;
-	pspec = energy * specular * (1.0f - mtl->roughness);
+	pdiff = energy * mrough;
+	pspec = energy * (1.0f - mrough);
 	assert(pdiff + pspec <= 1.0f);
 
 	if(rval <= pdiff) {
@@ -202,15 +199,15 @@ static void shade(cgm_vec3 *color, struct rayhit *hit, float energy, int max_ite
 		ray.origin = hit->v.pos;
 		ray_trace(&rcol, &ray, pdiff, max_iter - 1);
 
-		color->x += rcol.x * mtl->color.x * inv_color;
-		color->y += rcol.y * mtl->color.y * inv_color;
-		color->z += rcol.z * mtl->color.z * inv_color;
+		color->x += rcol.x * mcol.x;
+		color->y += rcol.y * mcol.y;
+		color->z += rcol.z * mcol.z;
 
 	} else if(rval <= pdiff + pspec) {
 		cgm_vnormalize(&n);
 		ray.dir = hit->ray.dir;
 
-		if(!mtl->metal && (transmit = mtl->transmit > 0.0f)) {
+		if(!mtl->metal && (transmit = mtrans > 0.0f)) {
 			/* calculate fresnel factor */
 			fres = fresnel(-cgm_vdot(&hit->ray.dir, &n), mtl->ior);
 			if(frand() < fres) {
@@ -228,8 +225,8 @@ reflect:	transmit = 0;
 		}
 
 		/* pick specular direction */
-		if(mtl->roughness > 0.0f) {
-			sphrand(&v, mtl->roughness);
+		if(mrough > 0.0f) {
+			sphrand(&v, mrough);
 			cgm_vadd(&ray.dir, &v);
 		}
 		cgm_vnormalize(&ray.dir);
@@ -245,9 +242,9 @@ reflect:	transmit = 0;
 			ray_trace(&rcol, &ray, pspec, max_iter - 1);
 
 			if(mtl->metal) {
-				color->x += rcol.x * mtl->color.x * inv_color;
-				color->y += rcol.y * mtl->color.y * inv_color;
-				color->z += rcol.z * mtl->color.z * inv_color;
+				color->x += rcol.x * mcol.x;
+				color->y += rcol.y * mcol.y;
+				color->z += rcol.z * mcol.z;
 			} else {
 				cgm_vadd(color, &rcol);
 			}
@@ -279,4 +276,45 @@ static float fresnel(float costheta, float ior)
 	xsq = x * x;
 
 	return r0 + (1.0f - r0) * (xsq * xsq * x);
+}
+
+void tex_lookup(cgm_vec3 *res, struct image *img, float u, float v)
+{
+	int tx, ty;
+
+	v = 1.0f - v;
+
+	if(img->ymask) {
+		ty = (int)(v * img->height) & img->ymask;
+	} else {
+		ty = (int)(v * img->height) % img->height;
+	}
+
+	if(img->xmask) {
+		tx = (int)(u * img->width) & img->xmask;
+		*res = ((cgm_vec3*)img->pixels)[(ty << img->xshift) + tx];
+	} else {
+		tx = (int)(u * img->width) % img->width;
+		*res = ((cgm_vec3*)img->pixels)[ty * img->width + tx];
+	}
+}
+
+static float mtlattr_num(struct material *mtl, int attr, cgm_vec2 *uv)
+{
+	cgm_vec3 texel;
+
+	if(mtl->attr[attr].tex) {
+		tex_lookup(&texel, mtl->attr[attr].tex, uv->x, uv->y);
+		return texel.x;
+	}
+	return mtl->attr[attr].value.x;
+}
+
+static void mtlattr_vec(cgm_vec3 *res, struct material *mtl, int attr, cgm_vec2 *uv)
+{
+	if(mtl->attr[attr].tex) {
+		tex_lookup(res, mtl->attr[attr].tex, uv->x, uv->y);
+	} else {
+		*res = mtl->attr[attr].value;
+	}
 }
