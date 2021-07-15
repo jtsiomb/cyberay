@@ -17,12 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /* -- PNG module -- */
+#ifndef NO_PNG
 
 #include <stdlib.h>
 #include <string.h>
 #include <png.h>
 #include "imago2.h"
-#include "ftmodule.h"
+#include "ftype_module.h"
 
 static int check_file(struct img_io *io);
 static int read_file(struct img_pixmap *img, struct img_io *io);
@@ -260,3 +261,13 @@ static int fmt_to_png_type(enum img_fmt fmt)
 	}
 	return -1;
 }
+
+#else
+/* building with PNG support disabled */
+
+int img_register_png(void)
+{
+	return -1;
+}
+
+#endif

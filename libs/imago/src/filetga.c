@@ -1,6 +1,6 @@
 /*
 libimago - a multi-format image file input/output library.
-Copyright (C) 2010-2015 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2010-2017 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published
@@ -20,25 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <string.h>
 #include <stdlib.h>
-#include "inttypes.h"
 #include "imago2.h"
-#include "ftmodule.h"
-
-
-#if  defined(__i386__) || defined(__ia64__) || defined(WIN32) || \
-    (defined(__alpha__) || defined(__alpha)) || \
-     defined(__arm__) || \
-    (defined(__mips__) && defined(__MIPSEL__)) || \
-     defined(__SYMBIAN32__) || \
-     defined(__x86_64__) || \
-     defined(__LITTLE_ENDIAN__)
-/* little endian */
-#define read_int16_le(f)	read_int16(f)
-#else
-/* big endian */
-#define read_int16_le(f)	read_int16_inv(f)
-#endif	/* endian check */
-
+#include "ftype_module.h"
+#include "byteord.h"
 
 enum {
 	IMG_NONE,
@@ -85,15 +69,13 @@ struct tga_footer {
 
 
 static int check(struct img_io *io);
-static int read(struct img_pixmap *img, struct img_io *io);
-static int write(struct img_pixmap *img, struct img_io *io);
-static int read_pixel(struct img_io *io, int rdalpha, uint32_t *pix);
-static int16_t read_int16(struct img_io *io);
-static int16_t read_int16_inv(struct img_io *io);
+static int read_tga(struct img_pixmap *img, struct img_io *io);
+static int write_tga(struct img_pixmap *img, struct img_io *io);
+static int read_pixel(struct img_io *io, int rdalpha, unsigned char *pix);
 
 int img_register_tga(void)
 {
-	static struct ftype_module mod = {".tga", check, read, write};
+	static struct ftype_module mod = {".tga:.targa", check, read_tga, write_tga};
 	return img_register_module(&mod);
 }
 
@@ -119,30 +101,30 @@ static int check(struct img_io *io)
 
 static int iofgetc(struct img_io *io)
 {
-	char c;
+	int c = 0;
 	return io->read(&c, 1, io->uptr) < 1 ? -1 : c;
 }
 
-static int read(struct img_pixmap *img, struct img_io *io)
+static int read_tga(struct img_pixmap *img, struct img_io *io)
 {
 	struct tga_header hdr;
-	int x, y;
+	unsigned long x, y;
 	int i, c;
-	uint32_t ppixel = 0;
 	int rle_mode = 0, rle_pix_left = 0;
 	int rdalpha;
+	int pixel_bytes;
 
 	/* read header */
 	hdr.idlen = iofgetc(io);
 	hdr.cmap_type = iofgetc(io);
 	hdr.img_type = iofgetc(io);
-	hdr.cmap_first = read_int16_le(io);
-	hdr.cmap_len = read_int16_le(io);
+	hdr.cmap_first = img_read_int16_le(io);
+	hdr.cmap_len = img_read_int16_le(io);
 	hdr.cmap_entry_sz = iofgetc(io);
-	hdr.img_x = read_int16_le(io);
-	hdr.img_y = read_int16_le(io);
-	hdr.img_width = read_int16_le(io);
-	hdr.img_height = read_int16_le(io);
+	hdr.img_x = img_read_int16_le(io);
+	hdr.img_y = img_read_int16_le(io);
+	hdr.img_width = img_read_int16_le(io);
+	hdr.img_height = img_read_int16_le(io);
 	hdr.img_bpp = iofgetc(io);
 	if((c = iofgetc(io)) == -1) {
 		return -1;
@@ -150,36 +132,36 @@ static int read(struct img_pixmap *img, struct img_io *io)
 	hdr.img_desc = c;
 
 	if(!IS_RGBA(hdr.img_type)) {
-		fprintf(stderr, "only true color tga images supported\n");
+		fprintf(stderr, "libimago: only true color tga images are supported\n");
 		return -1;
 	}
 
-	io->seek(hdr.idlen, SEEK_CUR, io);	/* skip the image ID */
+	io->seek(hdr.idlen, SEEK_CUR, io->uptr);	/* skip the image ID */
 
 	/* skip the color map if it exists */
 	if(hdr.cmap_type == 1) {
-		io->seek(hdr.cmap_len * hdr.cmap_entry_sz / 8, SEEK_CUR, io);
+		io->seek(hdr.cmap_len * hdr.cmap_entry_sz / 8, SEEK_CUR, io->uptr);
 	}
 
 	x = hdr.img_width;
 	y = hdr.img_height;
 	rdalpha = hdr.img_desc & 0xf;
+	pixel_bytes = rdalpha ? 4 : 3;
 
-	/* TODO make this IMG_FMT_RGB24 if there's no alpha channel */
-	if(img_set_pixels(img, x, y, IMG_FMT_RGBA32, 0) == -1) {
+	if(img_set_pixels(img, x, y, rdalpha ? IMG_FMT_RGBA32 : IMG_FMT_RGB24, 0) == -1) {
 		return -1;
 	}
 
 	for(i=0; i<y; i++) {
-		uint32_t *ptr;
-		int j;
+		unsigned char *ptr;
+		int j, k;
 
-		ptr = (uint32_t*)img->pixels + ((hdr.img_desc & 0x20) ? i : y - (i + 1)) * x;
+		ptr = (unsigned char*)img->pixels + ((hdr.img_desc & 0x20) ? i : y - (i + 1)) * x * pixel_bytes;
 
 		for(j=0; j<x; j++) {
 			/* if the image is raw, then just read the next pixel */
 			if(!IS_RLE(hdr.img_type)) {
-				if(read_pixel(io, rdalpha, &ppixel) == -1) {
+				if(read_pixel(io, rdalpha, ptr) == -1) {
 					return -1;
 				}
 			} else {
@@ -189,8 +171,12 @@ static int read(struct img_pixmap *img, struct img_io *io)
 				if(rle_pix_left) {
 					/* if it's a raw packet, read the next pixel, otherwise keep the same */
 					if(!rle_mode) {
-						if(read_pixel(io, rdalpha, &ppixel) == -1) {
+						if(read_pixel(io, rdalpha, ptr) == -1) {
 							return -1;
+						}
+					} else {
+						for(k=0; k<pixel_bytes; k++) {
+							ptr[k] = ptr[k - pixel_bytes];
 						}
 					}
 					--rle_pix_left;
@@ -200,51 +186,40 @@ static int read(struct img_pixmap *img, struct img_io *io)
 					rle_mode = (phdr & 128);		/* last bit shows the mode for this packet (1: rle, 0: raw) */
 					rle_pix_left = (phdr & ~128);	/* the rest gives the count of pixels minus one (we also read one here, so no +1) */
 					/* and read the first pixel of the packet */
-					if(read_pixel(io, rdalpha, &ppixel) == -1) {
+					if(read_pixel(io, rdalpha, ptr) == -1) {
 						return -1;
 					}
 				}
 			}
 
-			*ptr++ = ppixel;
+			ptr += pixel_bytes;
 		}
 	}
 
 	return 0;
 }
 
-static int write(struct img_pixmap *img, struct img_io *io)
+static int write_tga(struct img_pixmap *img, struct img_io *io)
 {
 	return -1;	/* TODO */
 }
 
-#define PACK_COLOR32(r,g,b,a) \
-	((((a) & 0xff) << 24) | \
-	 (((r) & 0xff) << 0) | \
-	 (((g) & 0xff) << 8) | \
-	 (((b) & 0xff) << 16))
-
-static int read_pixel(struct img_io *io, int rdalpha, uint32_t *pix)
+static int read_pixel(struct img_io *io, int rdalpha, unsigned char *pix)
 {
 	int r, g, b, a;
-	b = iofgetc(io);
-	g = iofgetc(io);
-	r = iofgetc(io);
-	a = rdalpha ? iofgetc(io) : 0xff;
-	*pix = PACK_COLOR32(r, g, b, a);
-	return a == -1 || r == -1 ? -1 : 0;
-}
+	if((b = iofgetc(io)) == -1 || (g = iofgetc(io)) == -1 || (r = iofgetc(io)) == -1) {
+		return -1;
+	}
 
-static int16_t read_int16(struct img_io *io)
-{
-	int16_t v;
-	io->read(&v, 2, io);
-	return v;
-}
+	pix[0] = r;
+	pix[1] = g;
+	pix[2] = b;
 
-static int16_t read_int16_inv(struct img_io *io)
-{
-	int16_t v;
-	io->read(&v, 2, io);
-	return ((v >> 8) & 0xff) | (v << 8);
+	if(rdalpha) {
+		if((a = iofgetc(io)) == -1) {
+			return -1;
+		}
+		pix[3] = a;
+	}
+	return 0;
 }

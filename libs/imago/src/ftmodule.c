@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <stdlib.h>
 #include <string.h>
-#include "ftmodule.h"
+#include "ftype_module.h"
 
 static struct list_node {
 	struct ftype_module *module;

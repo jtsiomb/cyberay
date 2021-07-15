@@ -1,6 +1,6 @@
 /*
 libimago - a multi-format image file input/output library.
-Copyright (C) 2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2010-2020 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published
@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include "imago2.h"
-#include "ftmodule.h"
+#include "ftype_module.h"
 
 static int pixel_size(enum img_fmt fmt);
 static size_t def_read(void *buf, size_t bytes, void *uptr);
@@ -141,6 +141,7 @@ int img_save_pixels(const char *fname, void *pix, int xsz, int ysz, enum img_fmt
 
 	img_init(&img);
 	img.fmt = fmt;
+	img.pixelsz = pixel_size(fmt);
 	img.width = xsz;
 	img.height = ysz;
 	img.pixels = pix;
@@ -285,6 +286,11 @@ int img_has_alpha(struct img_pixmap *img)
 		return 1;
 	}
 	return 0;
+}
+
+int img_is_greyscale(struct img_pixmap *img)
+{
+	return img->fmt == IMG_FMT_GREY8 || img->fmt == IMG_FMT_GREYF;
 }
 
 
